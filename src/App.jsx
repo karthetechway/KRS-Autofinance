@@ -138,7 +138,7 @@ const App = () => {
               {activeTab === 'collections' && 'EMI Collection'}
               {activeTab === 'ledger' && 'Payment History'}
             </h1>
-            <p className="label" style={{ margin: 0, color: 'var(--accent-main)' }}>KRS Auto Finance Control Panel</p>
+            <p className="label" style={{ margin: 0, color: 'var(--accent-main)', fontSize: '10px' }}>KRS Auto Finance Control Panel</p>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
@@ -146,7 +146,7 @@ const App = () => {
               <Search className="text-muted" size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
               <input 
                 className="input-modern" 
-                style={{ paddingLeft: '56px', height: '64px', width: '400px' }} 
+                style={{ paddingLeft: '48px', height: '48px', width: '320px', fontSize: '14px' }} 
                 placeholder="Search records..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -154,8 +154,8 @@ const App = () => {
             </div>
             
             {activeTab !== 'new-loan' && (
-              <button onClick={() => setActiveTab('new-loan')} className="btn-primary" style={{ padding: '0 32px', height: '64px', width: 'auto' }}>
-                <Plus size={22} /> NEW RECORD
+              <button onClick={() => setActiveTab('new-loan')} className="btn-primary" style={{ padding: '0 24px', height: '48px', width: 'auto', fontSize: '12px' }}>
+                <Plus size={18} /> NEW RECORD
               </button>
             )}
           </div>
