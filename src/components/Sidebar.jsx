@@ -25,7 +25,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
     <aside className="sidebar">
       <div className="brand" style={{ padding: '32px', justifyContent: 'center' }}>
         <div className="brand-icon" style={{ height: '100px', width: '100%' }}>
-          <img src="/logo.jpg" alt="KRS Logo" style={{ height: '100%', width: 'auto', objectFit: 'contain' }} />
+          <img src={`${import.meta.env.BASE_URL}logo.jpg`} alt="KRS Logo" style={{ height: '100%', width: 'auto', objectFit: 'contain' }} />
         </div>
       </div>
 

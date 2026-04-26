@@ -51,7 +51,7 @@ const CollectionSheet = ({ customers, onPay }) => {
       <div className="modal-content animate-fade" style={{ maxWidth: '450px' }}>
         <div style={{ padding: '40px', background: 'white', color: 'black' }} id="printable-receipt">
           <div style={{ textAlign: 'center', marginBottom: '32px', borderBottom: '2px solid #eee', paddingBottom: '24px' }}>
-            <img src="/logo.jpg" alt="Logo" style={{ width: '180px', marginBottom: '8px' }} />
+            <img src={`${import.meta.env.BASE_URL}logo.jpg`} alt="Logo" style={{ width: '180px', marginBottom: '8px' }} />
             <p style={{ fontSize: '10px', fontWeight: 800, color: '#666', marginTop: '4px', textTransform: 'uppercase' }}>Two Wheeler Mortgage Receipt</p>
             <p style={{ fontSize: '11px', fontWeight: 800, color: '#333', marginTop: '4px' }}>Contact: +91 98765 43210</p>
           </div>

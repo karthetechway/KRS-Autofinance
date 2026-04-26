@@ -40,7 +40,7 @@ const Login = ({ onLogin }) => {
 
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
           <div style={{ margin: '0 auto 16px', height: '120px', display: 'flex', justifyContent: 'center' }}>
-            <img src="/logo.jpg" alt="Logo" style={{ height: '100%', width: 'auto', objectFit: 'contain' }} />
+            <img src={`${import.meta.env.BASE_URL}logo.jpg`} alt="Logo" style={{ height: '100%', width: 'auto', objectFit: 'contain' }} />
           </div>
           <p className="label" style={{ margin: '0 0 40px' }}>Terminal Access Portal</p>
         </div>
