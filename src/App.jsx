@@ -12,9 +12,11 @@ import {
   FileText,
   BarChart3,
   ShieldCheck,
-  X
+  X,
+  FileCheck
 } from 'lucide-react';
 import { format, isToday, addMonths } from 'date-fns';
+import { calculateEMI } from './utils/finance';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -38,6 +40,7 @@ const App = () => {
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [showBriefing, setShowBriefing] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null);
 
   useEffect(() => {
     localStorage.setItem('krs_customers', JSON.stringify(customers));
@@ -66,21 +69,41 @@ const App = () => {
     setActiveTab('customers');
   };
 
-  const recordPayment = (customerId, amount, date) => {
+  const recordPayment = (customerId, paymentData) => {
+    // paymentData: { emiPaid, lateFeesPaid, date }
     const updated = customers.map(c => {
       if (c.id === customerId) {
-        const nextDate = new Date(c.nextDueDate);
-        const newNextDate = format(addMonths(nextDate, 1), 'yyyy-MM-dd');
+        let { paidEMI, partialEMIPaid = 0, nextDueDate, totalLateFeesPaid = 0 } = c;
+        const emiPaidNow = parseFloat(paymentData.emiPaid || 0);
+        const lateFeesPaidNow = parseFloat(paymentData.lateFeesPaid || 0);
+        
+        // Handle EMI Payment (Partial support)
+        let totalEMIContributed = (parseFloat(partialEMIPaid) || 0) + emiPaidNow;
+        const emiCost = parseFloat(c.emiAmount);
+        
+        let installmentsAdded = 0;
+        while (totalEMIContributed >= emiCost && paidEMI < c.emiMonths) {
+          paidEMI += 1;
+          totalEMIContributed -= emiCost;
+          installmentsAdded += 1;
+          // Update due date
+          nextDueDate = format(addMonths(new Date(nextDueDate), 1), 'yyyy-MM-dd');
+        }
         
         return {
           ...c,
-          paidEMI: c.paidEMI + 1,
-          nextDueDate: newNextDate,
+          paidEMI,
+          partialEMIPaid: totalEMIContributed,
+          nextDueDate,
+          totalLateFeesPaid: (parseFloat(totalLateFeesPaid) || 0) + lateFeesPaidNow,
           paymentHistory: [
             {
               id: `REC-${Date.now().toString().slice(-6)}`,
-              date: date,
-              amount: amount,
+              date: paymentData.date,
+              amount: emiPaidNow + lateFeesPaidNow,
+              emiPaid: emiPaidNow,
+              lateFeesPaid: lateFeesPaidNow,
+              type: installmentsAdded > 0 ? 'EMI Payment' : 'Partial Payment',
               customerName: c.name,
               vehicleNumber: c.vehicleNumber
             },
@@ -93,29 +116,54 @@ const App = () => {
     setCustomers(updated);
   };
 
-  const handleRefinance = (customerId, refinanceData) => {
-    const updated = customers.map(c => {
-      if (c.id === customerId) {
-        return {
-          ...c,
-          ...refinanceData,
-          status: 'active',
-          paymentHistory: [
-            {
-              id: `REF-${Date.now().toString().slice(-6)}`,
-              date: new Date().toISOString(),
-              amount: refinanceData.loanAmount,
-              type: 'Refinance',
-              customerName: c.name,
-              vehicleNumber: c.vehicleNumber
-            },
-            ...c.paymentHistory
-          ]
-        };
-      }
-      return c;
-    });
+  const closeAccount = (customerId) => {
+    const updated = customers.map(c => 
+      c.id === customerId ? { ...c, status: 'closed', closureDate: new Date().toISOString() } : c
+    );
     setCustomers(updated);
+  };
+
+  const updateCustomer = (updatedData) => {
+    const updated = customers.map(c => c.id === updatedData.id ? { ...c, ...updatedData } : c);
+    setCustomers(updated);
+    setEditingCustomer(null);
+    setActiveTab('customers');
+  };
+
+  const handleEdit = (customer) => {
+    setEditingCustomer(customer);
+    setActiveTab('new-loan');
+  };
+
+  const handleRefinance = (customerId, refinanceData) => {
+    // 1. Find the old customer
+    const oldCustomer = customers.find(c => c.id === customerId);
+    if (!oldCustomer) return;
+
+    // 2. Mark old customer as closed
+    const updatedCustomers = customers.map(c => 
+      c.id === customerId ? { ...c, status: 'closed' } : c
+    );
+
+    // 3. Create new customer entry
+    const newId = `KRS-${Math.floor(1000 + Math.random() * 9000)}`;
+    const emiDetails = calculateEMI(refinanceData.newTotalLoan, oldCustomer.interestRate, oldCustomer.emiMonths);
+    
+    const newCustomer = {
+      ...oldCustomer,
+      id: newId,
+      loanAmount: refinanceData.newTotalLoan,
+      paidEMI: 0,
+      nextDueDate: format(new Date(), 'yyyy-MM-dd'),
+      paymentHistory: [],
+      status: 'active',
+      refinancedFrom: oldCustomer.id,
+      ...emiDetails,
+      emiAmount: emiDetails.emi
+    };
+
+    setCustomers([...updatedCustomers, newCustomer]);
+    setActiveTab('customers');
   };
 
   const handleImport = (importedData) => {
@@ -144,13 +192,14 @@ const App = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
             <div style={{ position: 'relative' }}>
               <Search className="text-muted" size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
-              <input 
-                className="input-modern" 
-                style={{ paddingLeft: '48px', height: '48px', width: '320px', fontSize: '14px' }} 
-                placeholder="Search records..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+                <input 
+                  type="text" 
+                  placeholder="Search by Name, Phone or Vehicle Number..." 
+                  className="input-modern"
+                  style={{ width: '300px', background: 'rgba(255,255,255,0.02)' }}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
             </div>
             
             {activeTab !== 'new-loan' && (
@@ -171,10 +220,11 @@ const App = () => {
               transition={{ duration: 0.2 }}
             >
               {activeTab === 'dashboard' && <Dashboard customers={customers} />}
-              {activeTab === 'new-loan' && <LoanRegistration onAdd={addLoan} />}
-              {activeTab === 'customers' && <CustomerDatabase customers={customers} searchQuery={searchQuery} onImport={handleImport} onRefinance={handleRefinance} onAdd={addLoan} />}
+              {activeTab === 'new-loan' && <LoanRegistration onAdd={addLoan} onUpdate={updateCustomer} editingCustomer={editingCustomer} onCancel={() => { setEditingCustomer(null); setActiveTab('customers'); }} />}
+              {activeTab === 'customers' && <CustomerDatabase customers={customers.filter(c => c.status !== 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport} onRefinance={handleRefinance} onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} />}
               {activeTab === 'collections' && <CollectionSheet customers={customers} onPay={recordPayment} />}
               {activeTab === 'ledger' && <Ledger customers={customers} />}
+              {activeTab === 'closed' && <CustomerDatabase customers={customers.filter(c => c.status === 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport} onRefinance={handleRefinance} onAdd={addLoan} onEdit={handleEdit} isClosedView={true} />}
             </motion.div>
           </AnimatePresence>
         </section>
@@ -184,13 +234,15 @@ const App = () => {
         {showBriefing && (
           <div className="modal-overlay">
             <motion.div initial={{ scale: 0.98, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.98, opacity: 0 }} className="modal-content" style={{ maxWidth: '640px' }}>
+              <button className="close-btn" onClick={() => setShowBriefing(false)}>
+                <X size={18} />
+              </button>
               <div style={{ padding: '32px', borderBottom: '1px solid var(--border)', background: 'rgba(255,61,94,0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <h2 className="h3">System Briefing</h2>
                     <p className="label" style={{ margin: 0 }}>{format(new Date(), 'EEEE, do MMMM')}</p>
                   </div>
-                  <X className="text-muted" size={24} style={{ cursor: 'pointer' }} onClick={() => setShowBriefing(false)} />
                 </div>
               </div>
               <div style={{ padding: '32px' }}>

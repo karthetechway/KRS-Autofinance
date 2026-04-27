@@ -2,7 +2,7 @@ import { differenceInDays, isAfter } from 'date-fns';
 
 export const calculateEMI = (principal, rate, months) => {
   const p = parseFloat(principal) || 0;
-  const r = (parseFloat(rate) || 0) / 100;
+  const r_monthly = (parseFloat(rate) || 0) / 100; // Rate is now monthly
   const t = parseFloat(months) || 0;
 
   if (p === 0 || t === 0) {
@@ -15,8 +15,8 @@ export const calculateEMI = (principal, rate, months) => {
     };
   }
 
-  // Flat Interest Calculation (Common in local vehicle finance)
-  const totalInterest = p * r * (t / 12);
+  // Monthly Interest Calculation
+  const totalInterest = p * r_monthly * t;
   const totalPayable = p + totalInterest;
   const emi = totalPayable / t;
   const documentCharges = p * 0.10; // 10% deduction
@@ -67,11 +67,16 @@ export const calculateRefinance = (customer, topUpAmount) => {
   const remainingMonths = customer.emiMonths - customer.paidEMI;
   const principalPerMonth = parseFloat(customer.loanAmount) / customer.emiMonths;
   const outstandingPrincipal = principalPerMonth * remainingMonths;
-  const newTotalLoan = outstandingPrincipal + parseFloat(topUpAmount);
+  const topUp = parseFloat(topUpAmount) || 0;
+  const docCharge = topUp * 0.10;
+  const newTotalLoan = outstandingPrincipal + topUp;
   
   return {
     outstandingPrincipal: Math.round(outstandingPrincipal),
     newTotalLoan: Math.round(newTotalLoan),
+    topUpAmount: topUp,
+    docCharge: Math.round(docCharge),
+    amountToHandover: Math.round(topUp - docCharge),
     remainingMonths: remainingMonths
   };
 };

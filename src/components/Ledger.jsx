@@ -14,9 +14,9 @@ const Ledger = ({ customers }) => {
   ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const filtered = allPayments.filter(p => 
-    p.customerName.toLowerCase().includes(search.toLowerCase()) ||
-    p.id.toLowerCase().includes(search.toLowerCase()) ||
-    p.vehicleNumber.toLowerCase().includes(search.toLowerCase())
+    (p.customerName || "").toLowerCase().includes((search || "").toLowerCase()) ||
+    (p.id || "").toLowerCase().includes((search || "").toLowerCase()) ||
+    (p.vehicleNumber || "").toLowerCase().includes((search || "").toLowerCase())
   );
 
   const handleWhatsApp = (p) => {
@@ -37,7 +37,7 @@ const Ledger = ({ customers }) => {
               <input 
                 className="input-modern" 
                 style={{ paddingLeft: '36px', height: '44px', width: '260px' }} 
-                placeholder="Search Receipt ID or Name..."
+                placeholder="Search ID, Name or Vehicle..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />

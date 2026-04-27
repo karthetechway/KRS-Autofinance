@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Phone, History, Bike, Search, Download, Upload, User, X, FileText, ShieldCheck, Zap, ArrowUpRight, Calculator, IndianRupee, UserPlus, PlusCircle, MessageSquare } from 'lucide-react';
+import { Phone, History, Bike, Search, Download, Upload, User, X, FileText, ShieldCheck, Zap, ArrowUpRight, Calculator, IndianRupee, UserPlus, PlusCircle, MessageSquare, Edit, FileCheck } from 'lucide-react';
 import { parseCSVData, calculateRefinance } from '../utils/finance';
 import { format } from 'date-fns';
 import LoanRegistration from './LoanRegistration';
 
-const CustomerDatabase = ({ customers, searchQuery, onImport, onRefinance, onAdd }) => {
+const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, onRefinance, onAdd, onEdit, onCloseAccount, isClosedView = false }) => {
   const [showImport, setShowImport] = useState(false);
   const [showDetails, setShowDetails] = useState(null);
   const [showRefinance, setShowRefinance] = useState(null);
@@ -36,7 +36,7 @@ const CustomerDatabase = ({ customers, searchQuery, onImport, onRefinance, onAdd
 
   const executeRefinance = () => {
     if (!refinanceData) return;
-    onRefinance(showRefinance, refinanceData.newTotalLoan);
+    onRefinance(showRefinance.id, refinanceData);
     setShowRefinance(null);
     setTopUpAmount('');
   };
@@ -46,10 +46,10 @@ const CustomerDatabase = ({ customers, searchQuery, onImport, onRefinance, onAdd
     window.open(`https://wa.me/91${c.phone}?text=${text}`, '_blank');
   };
 
-  const filtered = customers.filter(c => 
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.vehicleNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.phone.includes(searchQuery)
+  const filtered = (customers || []).filter(c => 
+    (c.name || "").toLowerCase().includes((searchQuery || "").toLowerCase()) ||
+    (c.vehicleNumber || "").toLowerCase().includes((searchQuery || "").toLowerCase()) ||
+    (c.phone || "").includes(searchQuery || "")
   );
 
   return (
@@ -59,7 +59,17 @@ const CustomerDatabase = ({ customers, searchQuery, onImport, onRefinance, onAdd
           <h2 className="h2">Customer Ledger</h2>
           <p className="label">Total {customers.length} records in system</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{ position: 'relative' }}>
+            <Search className="text-muted" size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input 
+              className="input-modern" 
+              style={{ paddingLeft: '40px', height: '44px', width: '300px' }} 
+              placeholder="Search by Name, Vehicle or Phone..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
+            />
+          </div>
           <button className="btn-primary" style={{ width: 'auto', padding: '0 20px', height: '44px', background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
             <Download size={16} /> Export Ledger
           </button>
@@ -72,8 +82,10 @@ const CustomerDatabase = ({ customers, searchQuery, onImport, onRefinance, onAdd
             <tr>
               <th>Customer</th>
               <th>Vehicle</th>
-              <th>Principal</th>
+              <th>Financials</th>
               <th>Progress</th>
+              <th>Outstanding</th>
+              {isClosedView && <th>Closed On</th>}
               <th>Status</th>
               <th style={{ textAlign: 'center' }}>Actions</th>
             </tr>
@@ -104,8 +116,11 @@ const CustomerDatabase = ({ customers, searchQuery, onImport, onRefinance, onAdd
                   <p className="label" style={{ fontSize: '11px', margin: 0 }}>{c.vehicleNumber}</p>
                 </td>
                 <td>
-                  <p className="font-black" style={{ fontSize: '18px' }}>₹{parseFloat(c.loanAmount).toLocaleString()}</p>
-                  <p className="text-accent" style={{ fontSize: '11px', fontWeight: 800 }}>EMI: ₹{c.emiAmount}</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <p className="font-black" style={{ fontSize: '16px' }}>L: ₹{parseFloat(c.loanAmount).toLocaleString()}</p>
+                    <p className="text-muted" style={{ fontSize: '10px', fontWeight: 800 }}>I: ₹{parseFloat(c.totalInterest || 0).toLocaleString()}</p>
+                    <p className="text-accent" style={{ fontSize: '10px', fontWeight: 800 }}>EMI: ₹{c.emiAmount}</p>
+                  </div>
                 </td>
                 <td>
                   <div style={{ width: '100px' }}>
@@ -119,10 +134,28 @@ const CustomerDatabase = ({ customers, searchQuery, onImport, onRefinance, onAdd
                   </div>
                 </td>
                 <td>
+                  <p className="font-black" style={{ fontSize: '16px', color: 'var(--accent-main)' }}>
+                    ₹{(parseFloat(c.totalPayable || 0) - (parseFloat(c.emiAmount || 0) * c.paidEMI)).toLocaleString()}
+                  </p>
+                  <p className="label" style={{ fontSize: '9px', margin: 0 }}>Total: ₹{parseFloat(c.totalPayable || 0).toLocaleString()}</p>
+                </td>
+                {isClosedView && (
+                  <td>
+                    <p className="font-black" style={{ fontSize: '14px' }}>{c.closureDate ? format(new Date(c.closureDate), 'dd MMM yyyy') : 'N/A'}</p>
+                  </td>
+                )}
+                <td>
                   <span className={`badge ${c.status === 'active' ? 'badge-success' : 'badge-error'}`} style={{ fontSize: '11px', padding: '6px 12px' }}>{c.status}</span>
                 </td>
                 <td>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                    <button 
+                      onClick={() => onEdit(c)}
+                      title="Edit Customer"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', padding: '8px', borderRadius: '8px', color: 'var(--accent-main)', cursor: 'pointer' }}
+                    >
+                      <Edit size={14} />
+                    </button>
                     <button 
                       onClick={() => setShowDetails(c)}
                       title="Vault Documents"
@@ -146,6 +179,17 @@ const CustomerDatabase = ({ customers, searchQuery, onImport, onRefinance, onAdd
                         >
                           <ArrowUpRight size={14} />
                         </button>
+                        <button 
+                          onClick={() => {
+                            if(window.confirm('Are you sure you want to close this account permanently?')) {
+                              onCloseAccount(c.id);
+                            }
+                          }}
+                          title="Close Account"
+                          style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', padding: '8px', borderRadius: '8px', color: '#10b981', cursor: 'pointer' }}
+                        >
+                          <FileCheck size={14} />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -162,11 +206,11 @@ const CustomerDatabase = ({ customers, searchQuery, onImport, onRefinance, onAdd
       {showRefinance && (
         <div className="modal-overlay">
           <div className="modal-content animate-fade" style={{ maxWidth: '480px' }}>
+            <button className="close-btn" onClick={() => setShowRefinance(null)}>
+              <X size={18} />
+            </button>
             <div style={{ padding: '24px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 className="h3">Top-up Refinance</h3>
-                <X style={{ cursor: 'pointer' }} onClick={() => setShowRefinance(null)} />
-              </div>
+              <h3 className="h3">Top-up Refinance</h3>
             </div>
             <div style={{ padding: '24px' }}>
               <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '16px', border: '1px dashed var(--border)', marginBottom: '24px' }}>
@@ -196,10 +240,26 @@ const CustomerDatabase = ({ customers, searchQuery, onImport, onRefinance, onAdd
               </div>
 
               {refinanceData && (
-                <div style={{ background: 'rgba(16,185,129,0.05)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(16,185,129,0.2)', marginBottom: '24px' }}>
-                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ background: 'rgba(16,185,129,0.05)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(16,185,129,0.2)', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span className="text-muted font-bold" style={{ fontSize: '12px' }}>Outstanding Principal</span>
+                      <span className="font-black">₹{refinanceData.outstandingPrincipal.toLocaleString()}</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span className="text-muted font-bold" style={{ fontSize: '12px' }}>Top-up Amount</span>
+                      <span className="font-black">₹{refinanceData.topUpAmount.toLocaleString()}</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span className="text-error font-bold" style={{ fontSize: '12px' }}>Doc Charge (10%)</span>
+                      <span className="text-error font-black">- ₹{refinanceData.docCharge.toLocaleString()}</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(16,185,129,0.2)', paddingTop: '12px' }}>
+                      <span className="text-success font-black" style={{ fontSize: '14px' }}>In Hand Cash</span>
+                      <span className="text-success font-black" style={{ fontSize: '24px' }}>₹{refinanceData.amountToHandover.toLocaleString()}</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
                       <span className="text-muted font-bold" style={{ fontSize: '12px' }}>New Total Principal</span>
-                      <span className="text-success font-black" style={{ fontSize: '20px' }}>₹{refinanceData.newTotalLoan.toLocaleString()}</span>
+                      <span className="text-muted font-black">₹{refinanceData.newTotalLoan.toLocaleString()}</span>
                    </div>
                 </div>
               )}
@@ -220,11 +280,11 @@ const CustomerDatabase = ({ customers, searchQuery, onImport, onRefinance, onAdd
       {showDetails && (
         <div className="modal-overlay">
           <div className="modal-content animate-fade" style={{ maxWidth: '800px' }}>
+            <button className="close-btn" onClick={() => setShowDetails(null)}>
+              <X size={18} />
+            </button>
             <div style={{ padding: '24px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 className="h3">{showDetails.name} <span className="text-muted" style={{ fontSize: '12px' }}>Vault</span></h3>
-                <X style={{ cursor: 'pointer' }} onClick={() => setShowDetails(null)} />
-              </div>
+              <h3 className="h3">{showDetails.name} <span className="text-muted" style={{ fontSize: '12px' }}>Vault</span></h3>
             </div>
             <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
               <div className="card" style={{ padding: '16px' }}>

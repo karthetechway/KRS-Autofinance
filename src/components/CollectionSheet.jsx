@@ -9,46 +9,69 @@ const CollectionSheet = ({ customers, onPay }) => {
   const [showReceipt, setShowReceipt] = useState(null);
   const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [search, setSearch] = useState('');
+  const [emiPaid, setEmiPaid] = useState('');
+  const [lateFeesPaid, setLateFeesPaid] = useState('');
 
   const filteredCustomers = customers.filter(c => 
     c.status === 'active' && (
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search) ||
-      c.vehicleNumber.toLowerCase().includes(search.toLowerCase())
+      (c.name || "").toLowerCase().includes((search || "").toLowerCase()) ||
+      (c.phone || "").includes(search || "") ||
+      (c.vehicleNumber || "").toLowerCase().includes((search || "").toLowerCase())
     )
   );
 
   const handlePay = (e) => {
     e.preventDefault();
-    if (!selected || !amount) return;
+    if (!selected) return;
     
-    onPay(selected.id, amount, new Date(paymentDate).toISOString());
+    onPay(selected.id, {
+      emiPaid: emiPaid || 0,
+      lateFeesPaid: lateFeesPaid || 0,
+      date: new Date(paymentDate).toISOString()
+    });
     
-    // Setup data for receipt
+    // Calculate installment info for receipt
+    const emiCost = parseFloat(selected.emiAmount);
+    const emiPaidNow = parseFloat(emiPaid || 0);
+    const totalContributed = (parseFloat(selected.partialEMIPaid) || 0) + emiPaidNow;
+    const installmentsAdded = Math.floor(totalContributed / emiCost);
+    
+    let instInfo = `Installment ${selected.paidEMI + 1}`;
+    if (installmentsAdded > 1) {
+      instInfo = `Installments ${selected.paidEMI + 1} - ${selected.paidEMI + installmentsAdded}`;
+    } else if (installmentsAdded === 0 && emiPaidNow > 0) {
+      instInfo = `Installment ${selected.paidEMI + 1} (Partial Payment)`;
+    }
+
     const lateFees = calculateLateFees(selected.nextDueDate);
     setShowReceipt({
       customer: selected,
-      amount: amount,
-      lateFees: lateFees,
+      emiPaid: emiPaidNow,
+      lateFeesPaid: lateFeesPaid || 0,
+      instInfo: instInfo,
       date: new Date(paymentDate).toISOString(),
       receiptNo: `REC-${Date.now().toString().slice(-6)}`
     });
     
     setSelected(null);
-    setAmount('');
+    setEmiPaid('');
+    setLateFeesPaid('');
     setPaymentDate(format(new Date(), 'yyyy-MM-dd'));
   };
 
   const sendReminder = (c) => {
     const lateFees = calculateLateFees(c.nextDueDate);
-    const total = parseFloat(c.emiAmount) + lateFees.amount;
-    const text = `*KRS Auto Finance Reminder*%0A--------------------------%0ADear ${c.name},%0A%0AThis is a friendly reminder that your EMI for vehicle *${c.vehicleNumber}* was due on *${format(new Date(c.nextDueDate), 'dd MMM yyyy')}*.%0A%0AAmount Due: ₹${total}%0A%0APlease settle the payment at the earliest to avoid further late fees.%0A%0AThank you!`;
+    const total = parseFloat(c.emiAmount || 0) + (lateFees.amount || 0);
+    const text = `*KRS Auto Finance Reminder*%0A--------------------------%0ADear ${c.name},%0A%0AThis is a friendly reminder that your EMI for vehicle *${c.vehicleNumber}* was due on *${format(new Date(c.nextDueDate), 'dd MMM yyyy')}*.%0A%0AAmount Due: ₹${total.toFixed(2)}%0A%0APlease settle the payment at the earliest to avoid further late fees.%0A%0AThank you!`;
     window.open(`https://wa.me/91${c.phone}?text=${text}`, '_blank');
   };
 
   const ReceiptModal = ({ data, onClose }) => (
     <div className="modal-overlay">
       <div className="modal-content animate-fade" style={{ maxWidth: '450px' }}>
+        <button className="close-btn" style={{ background: '#f8f9fa', color: '#666', top: '16px', right: '16px' }} onClick={onClose}>
+          <X size={18} />
+        </button>
         <div style={{ padding: '40px', background: 'white', color: 'black' }} id="printable-receipt">
           <div style={{ textAlign: 'center', marginBottom: '32px', borderBottom: '2px solid #eee', paddingBottom: '24px' }}>
             <img src={`${import.meta.env.BASE_URL}logo.jpg`} alt="Logo" style={{ width: '180px', marginBottom: '8px' }} />
@@ -79,18 +102,20 @@ const CollectionSheet = ({ customers, onPay }) => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
                 <tr style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '12px 0', fontSize: '12px', fontWeight: 600 }}>Installment Due</td>
-                  <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 800 }}>₹{data.customer.emiAmount}</td>
+                  <td style={{ padding: '12px 0', fontSize: '12px', fontWeight: 600 }}>
+                    {data.instInfo}
+                  </td>
+                  <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 800 }}>₹{data.emiPaid}</td>
                 </tr>
-                {data.lateFees.amount > 0 && (
+                {data.lateFeesPaid > 0 && (
                   <tr style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '12px 0', fontSize: '12px', fontWeight: 600 }}>Late Fees ({data.lateFees.days} Days)</td>
-                    <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 800, color: '#ef4444' }}>₹{data.lateFees.amount}</td>
+                    <td style={{ padding: '12px 0', fontSize: '12px', fontWeight: 600 }}>Late Fees Payment</td>
+                    <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 800, color: '#ef4444' }}>₹{data.lateFeesPaid}</td>
                   </tr>
                 )}
                 <tr style={{ background: '#fcfcfc' }}>
                   <td style={{ padding: '16px 0', fontSize: '14px', fontWeight: 900, textTransform: 'uppercase' }}>Total Received</td>
-                  <td style={{ padding: '16px 0', textAlign: 'right', fontSize: '20px', fontWeight: 900 }}>₹{data.amount}</td>
+                  <td style={{ padding: '16px 0', textAlign: 'right', fontSize: '20px', fontWeight: 900 }}>₹{(parseFloat(data.emiPaid) + parseFloat(data.lateFeesPaid)).toFixed(2)}</td>
                 </tr>
               </tbody>
             </table>
@@ -123,9 +148,10 @@ const CollectionSheet = ({ customers, onPay }) => {
            <div style={{ position: 'relative' }}>
               <Search className="text-muted" size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
               <input 
+                type="text" 
+                placeholder="Search by Name, Phone, or Vehicle Number..." 
                 className="input-modern" 
-                style={{ paddingLeft: '52px' }}
-                placeholder="Type Name, Mobile or Vehicle Number..."
+                style={{ paddingLeft: '48px', height: '56px', fontSize: '18px' }}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -135,32 +161,30 @@ const CollectionSheet = ({ customers, onPay }) => {
         {filteredCustomers.map((c) => {
           const isOverdue = isAfter(new Date(), new Date(c.nextDueDate));
           const lateFees = calculateLateFees(c.nextDueDate);
-          const total = parseFloat(c.emiAmount) + lateFees.amount;
+          const total = (parseFloat(c.emiAmount || 0) + (lateFees.amount || 0)).toFixed(2);
 
           return (
-            <div key={c.id} className="card" style={{ padding: '32px', borderColor: isOverdue ? 'rgba(239,68,68,0.2)' : 'var(--border)' }}>
+            <div key={c.id} className="card" style={{ padding: '16px', borderColor: isOverdue ? 'rgba(239,68,68,0.2)' : 'var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                  <div className="brand-icon" style={{ width: '64px', height: '64px', background: isOverdue ? 'rgba(239,68,68,0.1)' : 'rgba(255,61,94,0.1)', color: isOverdue ? 'var(--error)' : 'var(--accent-main)' }}>
+                  <div className="brand-icon" style={{ width: '44px', height: '44px', background: isOverdue ? 'rgba(239,68,68,0.1)' : 'rgba(255,61,94,0.1)', color: isOverdue ? 'var(--error)' : 'var(--accent-main)', fontSize: '14px' }}>
                     {c.name[0]}
                   </div>
                   <div>
-                    <p className="font-black" style={{ fontSize: '15px', color: 'var(--accent-main)', marginTop: '4px' }}>
+                    <p className="font-black" style={{ fontSize: '18px', color: 'var(--text-main)' }}>{c.name}</p>
+                    <p className="font-black" style={{ fontSize: '12px', color: 'var(--accent-main)', marginTop: '2px' }}>
                       {c.phone} • {c.vehicleNumber}
                     </p>
-                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      {c.address}
-                    </p>
-                    <p className="label" style={{ margin: '8px 0 0' }}>
-                      NEXT DUE: {format(new Date(c.nextDueDate), 'dd MMM yyyy')}
+                    <p className="label" style={{ margin: '4px 0 0', fontSize: '9px' }}>
+                      DUE: {format(new Date(c.nextDueDate), 'dd MMM yyyy')}
                     </p>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '48px' }}>
                   <div style={{ textAlign: 'right' }}>
-                    {isOverdue && <p className="text-error font-black" style={{ fontSize: '12px' }}>LATE FEE: ₹{lateFees.amount}</p>}
-                    <p className="font-black" style={{ fontSize: '32px', color: isOverdue ? 'var(--error)' : 'var(--text-main)' }}>₹{total}</p>
+                    {isOverdue && <p className="text-error font-black" style={{ fontSize: '10px' }}>LATE: ₹{lateFees.amount}</p>}
+                    <p className="font-black" style={{ fontSize: '24px', color: isOverdue ? 'var(--error)' : 'var(--text-main)' }}>₹{total}</p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     {isOverdue && (
@@ -173,7 +197,12 @@ const CollectionSheet = ({ customers, onPay }) => {
                         <MessageSquare size={18} />
                       </button>
                     )}
-                    <button onClick={() => { setSelected(c); setAmount(total); }} className="btn-primary" style={{ width: 'auto', padding: '0 32px', height: '54px' }}>
+                    <button onClick={() => { 
+                      setSelected(c); 
+                      const lf = calculateLateFees(c.nextDueDate);
+                      setEmiPaid(c.emiAmount);
+                      setLateFeesPaid(lf.amount);
+                    }} className="btn-primary" style={{ width: 'auto', padding: '0 32px', height: '54px' }}>
                       Collect
                     </button>
                   </div>
@@ -215,12 +244,24 @@ const CollectionSheet = ({ customers, onPay }) => {
               />
             </div>
 
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="label">Amount Received (₹)</label>
-              <input 
-                className="input-modern" style={{ fontSize: '40px', fontWeight: 900, textAlign: 'center', padding: '32px' }}
-                type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="label">EMI Amount (₹)</label>
+                <input 
+                  className="input-modern" style={{ fontSize: '24px', fontWeight: 900, textAlign: 'center' }}
+                  type="number" value={emiPaid} onChange={(e) => setEmiPaid(e.target.value)}
+                  placeholder="0"
+                />
+                {selected.partialEMIPaid > 0 && <p className="label" style={{ marginTop: '8px', color: 'var(--accent-main)' }}>PREV PARTIAL: ₹{selected.partialEMIPaid}</p>}
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="label">Late Fees (₹)</label>
+                <input 
+                  className="input-modern" style={{ fontSize: '24px', fontWeight: 900, textAlign: 'center', color: 'var(--error)' }}
+                  type="number" value={lateFeesPaid} onChange={(e) => setLateFeesPaid(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '16px' }}>
