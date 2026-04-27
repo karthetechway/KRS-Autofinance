@@ -50,7 +50,7 @@ const CollectionSheet = ({ customers, onPay }) => {
       lateFeesPaid: lateFeesPaid || 0,
       instInfo: instInfo,
       date: new Date(paymentDate).toISOString(),
-      receiptNo: `REC-${Date.now().toString().slice(-6)}`
+      receiptNo: `KRS-${Date.now().toString().slice(-6)}`
     });
     
     setSelected(null);
@@ -132,6 +132,12 @@ const CollectionSheet = ({ customers, onPay }) => {
 
         <div style={{ padding: '24px', borderTop: '1px solid var(--border)', display: 'flex', gap: '12px' }}>
           <button onClick={onClose} className="btn-primary" style={{ background: 'var(--bg-hover)', color: 'white' }}>Close</button>
+          <button onClick={() => {
+            const text = `*KRS Auto Finance Receipt*%0A--------------------------%0AReceipt No: ${data.receiptNo}%0ACustomer: ${data.customer.name}%0AVehicle: ${data.customer.vehicleNumber}%0A${data.instInfo}%0AAmount Paid: ₹${(parseFloat(data.emiPaid) + parseFloat(data.lateFeesPaid)).toFixed(2)}%0ADate: ${format(new Date(data.date), 'dd MMM yyyy')}%0A--------------------------%0AThank you!`;
+            window.open(`https://wa.me/91${data.customer.phone}?text=${text}`, '_blank');
+          }} className="btn-primary" style={{ background: '#25D366' }}>
+            <MessageSquare size={18} /> Send WhatsApp
+          </button>
           <button onClick={() => window.print()} className="btn-primary">
             <Printer size={18} /> Print Receipt
           </button>
@@ -183,8 +189,9 @@ const CollectionSheet = ({ customers, onPay }) => {
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '48px' }}>
                   <div style={{ textAlign: 'right' }}>
+                    <p className="label" style={{ margin: 0, fontSize: '10px' }}>EMI: ₹{c.emiAmount}</p>
                     {isOverdue && <p className="text-error font-black" style={{ fontSize: '10px' }}>LATE: ₹{lateFees.amount}</p>}
-                    <p className="font-black" style={{ fontSize: '24px', color: isOverdue ? 'var(--error)' : 'var(--text-main)' }}>₹{total}</p>
+                    <p className="font-black" style={{ fontSize: '24px', color: isOverdue ? 'var(--error)' : 'var(--text-main)', marginTop: '2px' }}>₹{total}</p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     {isOverdue && (

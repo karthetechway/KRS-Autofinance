@@ -98,7 +98,7 @@ const App = () => {
           totalLateFeesPaid: (parseFloat(totalLateFeesPaid) || 0) + lateFeesPaidNow,
           paymentHistory: [
             {
-              id: `REC-${Date.now().toString().slice(-6)}`,
+              id: `KRS-${Date.now().toString().slice(-6)}`,
               date: paymentData.date,
               amount: emiPaidNow + lateFeesPaidNow,
               emiPaid: emiPaidNow,
@@ -224,6 +224,7 @@ const App = () => {
               {activeTab === 'customers' && <CustomerDatabase customers={customers.filter(c => c.status !== 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport} onRefinance={handleRefinance} onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} />}
               {activeTab === 'collections' && <CollectionSheet customers={customers} onPay={recordPayment} />}
               {activeTab === 'ledger' && <Ledger customers={customers} />}
+              {activeTab === 'partial-dues' && <CustomerDatabase customers={customers.filter(c => c.partialEMIPaid > 0)} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport} onRefinance={handleRefinance} onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} isPartialView={true} />}
               {activeTab === 'closed' && <CustomerDatabase customers={customers.filter(c => c.status === 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport} onRefinance={handleRefinance} onAdd={addLoan} onEdit={handleEdit} isClosedView={true} />}
             </motion.div>
           </AnimatePresence>

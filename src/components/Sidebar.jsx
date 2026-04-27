@@ -9,7 +9,8 @@ import {
   FileText,
   Home,
   CreditCard,
-  Upload
+  Upload,
+  Zap
 } from 'lucide-react';
 
 const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
@@ -19,6 +20,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
     { id: 'customers', icon: Users, label: 'Customer Ledger' },
     { id: 'collections', icon: CreditCard, label: 'EMI Collection' },
     { id: 'ledger', icon: FileText, label: 'Payments' },
+    { id: 'partial-dues', icon: Zap, label: 'Partial Dues' },
     { id: 'closed', icon: ShieldCheck, label: 'Closed Accounts' },
   ];
 

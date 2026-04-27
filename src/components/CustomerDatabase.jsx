@@ -4,7 +4,7 @@ import { parseCSVData, calculateRefinance } from '../utils/finance';
 import { format } from 'date-fns';
 import LoanRegistration from './LoanRegistration';
 
-const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, onRefinance, onAdd, onEdit, onCloseAccount, isClosedView = false }) => {
+const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, onRefinance, onAdd, onEdit, onCloseAccount, isClosedView = false, isPartialView = false }) => {
   const [showImport, setShowImport] = useState(false);
   const [showDetails, setShowDetails] = useState(null);
   const [showRefinance, setShowRefinance] = useState(null);
@@ -86,6 +86,8 @@ const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, on
               <th>Progress</th>
               <th>Outstanding</th>
               {isClosedView && <th>Closed On</th>}
+              {isPartialView && <th>Collected</th>}
+              {isPartialView && <th>Remaining</th>}
               <th>Status</th>
               <th style={{ textAlign: 'center' }}>Actions</th>
             </tr>
@@ -143,6 +145,16 @@ const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, on
                   <td>
                     <p className="font-black" style={{ fontSize: '14px' }}>{c.closureDate ? format(new Date(c.closureDate), 'dd MMM yyyy') : 'N/A'}</p>
                   </td>
+                )}
+                {isPartialView && (
+                  <>
+                    <td>
+                      <p className="font-black" style={{ color: 'var(--success)' }}>₹{parseFloat(c.partialEMIPaid || 0).toLocaleString()}</p>
+                    </td>
+                    <td>
+                      <p className="font-black" style={{ color: 'var(--accent-main)' }}>₹{(parseFloat(c.emiAmount) - parseFloat(c.partialEMIPaid || 0)).toLocaleString()}</p>
+                    </td>
+                  </>
                 )}
                 <td>
                   <span className={`badge ${c.status === 'active' ? 'badge-success' : 'badge-error'}`} style={{ fontSize: '11px', padding: '6px 12px' }}>{c.status}</span>
