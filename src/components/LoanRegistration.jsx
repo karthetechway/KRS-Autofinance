@@ -10,7 +10,7 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
     vehicleModel: '', vehicleNumber: '', modelYear: format(new Date(), 'yyyy'),
     loanAmount: '', interestRate: '', emiMonths: '',
     docCharge: '10', paidEMI: 0, nextDueDate: format(new Date(), 'yyyy-MM-dd'),
-    photo: null, aadharFile: null, rcFile: null
+    photo: null, photoName: '', aadharFile: null, aadharName: '', rcFile: null, rcName: ''
   };
   const [formData, setFormData] = useState(initialForm);
 
@@ -29,8 +29,13 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
   };
 
   const handleFile = (field, file) => {
+    if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => setFormData({ ...formData, [field]: e.target.result });
+    reader.onload = (e) => setFormData(prev => ({ 
+      ...prev, 
+      [field]: e.target.result,
+      [`${field.replace('File', '')}Name`]: file.name 
+    }));
     reader.readAsDataURL(file);
   };
 
@@ -60,32 +65,32 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
       <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '40px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           <div>
-             <p className="label">Step 1: Identity & Assets</p>
-             <div className="upload-grid">
-                 <div className={`file-upload-card ${formData.photo ? 'has-file' : ''}`}>
-                    <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFile('photo', e.target.files[0])} />
-                    <div className="icon-container">{formData.photo ? <CheckCircle2 size={32} /> : <Camera size={32} />}</div>
-                    <span>{formData.photo ? 'Photo Loaded' : 'Customer Photo'}</span>
-                 </div>
-                 <div className={`file-upload-card ${formData.aadharFile ? 'has-file' : ''}`}>
-                    <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFile('aadharFile', e.target.files[0])} />
-                    <div className="icon-container">{formData.aadharFile ? <CheckCircle2 size={32} /> : <ShieldCheck size={32} />}</div>
-                    <span>{formData.aadharFile ? 'Aadhar Verified' : 'Aadhar ID'}</span>
-                 </div>
-                 <div className={`file-upload-card ${formData.rcFile ? 'has-file' : ''}`}>
-                    <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFile('rcFile', e.target.files[0])} />
-                    <div className="icon-container">{formData.rcFile ? <CheckCircle2 size={32} /> : <FileText size={32} />}</div>
-                    <span>{formData.rcFile ? 'RC Book Loaded' : 'RC Book'}</span>
-                 </div>
-             </div>
-          </div>
-
-          <div>
-             <p className="label">Step 2: Basic Details</p>
+             <p className="label">Step 1: Basic Details</p>
              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <input required className="input-modern" placeholder="Full Name" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
                 <input required className="input-modern" placeholder="Phone Number" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
                 <textarea required className="input-modern" placeholder="Permanent Address" style={{ height: '80px' }} value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} />
+             </div>
+          </div>
+
+          <div>
+             <p className="label">Step 2: Identity & Assets</p>
+             <div className="upload-grid">
+                 <div className={`file-upload-card ${formData.photo ? 'has-file' : ''}`}>
+                    <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFile('photo', e.target.files[0])} />
+                    <div className="icon-container">{formData.photo ? <CheckCircle2 size={32} /> : <Camera size={32} />}</div>
+                    <span>{formData.photoName || 'Customer Photo'}</span>
+                 </div>
+                 <div className={`file-upload-card ${formData.aadharFile ? 'has-file' : ''}`}>
+                    <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFile('aadharFile', e.target.files[0])} />
+                    <div className="icon-container">{formData.aadharFile ? <CheckCircle2 size={32} /> : <ShieldCheck size={32} />}</div>
+                    <span>{formData.aadharName || 'Aadhar ID'}</span>
+                 </div>
+                 <div className={`file-upload-card ${formData.rcFile ? 'has-file' : ''}`}>
+                    <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFile('rcFile', e.target.files[0])} />
+                    <div className="icon-container">{formData.rcFile ? <CheckCircle2 size={32} /> : <FileText size={32} />}</div>
+                    <span>{formData.rcName || 'RC Book'}</span>
+                 </div>
              </div>
           </div>
         </div>

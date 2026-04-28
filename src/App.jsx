@@ -12,8 +12,9 @@ import {
   FileText,
   BarChart3,
   ShieldCheck,
-  X,
-  FileCheck
+  FileCheck,
+  Menu,
+  X
 } from 'lucide-react';
 import { format, isToday, addMonths } from 'date-fns';
 import { calculateEMI } from './utils/finance';
@@ -25,6 +26,8 @@ import LoanRegistration from './components/LoanRegistration';
 import CustomerDatabase from './components/CustomerDatabase';
 import CollectionSheet from './components/CollectionSheet';
 import Ledger from './components/Ledger';
+import PaymentReports from './components/PaymentReports';
+import Analytics from './components/Analytics';
 import Login from './components/Login';
 import ImportPortal from './components/ImportPortal';
 
@@ -39,8 +42,10 @@ const App = () => {
     return saved ? JSON.parse(saved) : [];
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [showResults, setShowResults] = useState(false);
   const [showBriefing, setShowBriefing] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('krs_customers', JSON.stringify(customers));
@@ -173,34 +178,95 @@ const App = () => {
   if (!isLoggedIn) return <Login onLogin={handleLogin} />;
 
   return (
-    <div className="app-shell">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
+    <div className={`app-shell ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          setSearchQuery('');
+          setIsSidebarOpen(false);
+        }} 
+        onLogout={handleLogout}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+      />
       
       <main className="main-container">
         <header className="header">
-          <div>
-            <h1 className="h2" style={{ margin: 0 }}>
-              {activeTab === 'dashboard' && 'Home'}
-              {activeTab === 'new-loan' && 'Customer Addition'}
-              {activeTab === 'customers' && 'Customer Ledger'}
-              {activeTab === 'collections' && 'EMI Collection'}
-              {activeTab === 'ledger' && 'Payment History'}
-            </h1>
-            <p className="label" style={{ margin: 0, color: 'var(--accent-main)', fontSize: '10px' }}>KRS Auto Finance Control Panel</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <button 
+              className="mobile-menu-btn" 
+              onClick={() => setIsSidebarOpen(true)}
+              style={{ display: 'none' }}
+            >
+              <Menu size={24} />
+            </button>
+            <div>
+              <h1 className="h2" style={{ margin: 0 }}>
+                {activeTab === 'dashboard' && 'Home'}
+                {activeTab === 'new-loan' && 'Customer Addition'}
+                {activeTab === 'customers' && 'Customer Ledger'}
+                {activeTab === 'collections' && 'EMI Collection'}
+                {activeTab === 'ledger' && 'Payment History'}
+              </h1>
+              <p className="label" style={{ margin: 0, color: 'var(--accent-main)', fontSize: '10px' }}>KRS Auto Finance Control Panel</p>
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-            <div style={{ position: 'relative' }}>
-              <Search className="text-muted" size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+            {activeTab !== 'new-loan' && (
+              <div style={{ position: 'relative' }}>
+                <Search className="text-muted" size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input 
                   type="text" 
-                  placeholder="Search by Name, Phone or Vehicle Number..." 
+                  placeholder="Search name, phone, vehicle..." 
                   className="input-modern"
-                  style={{ width: '300px', background: 'rgba(255,255,255,0.02)' }}
+                  style={{ width: '300px', background: 'rgba(255,255,255,0.02)', paddingLeft: '48px' }}
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setShowResults(true)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setShowResults(true);
+                  }}
                 />
-            </div>
+                {searchQuery && showResults && (
+                  <div className="card animate-fade" style={{ position: 'absolute', top: '120%', left: 0, right: 0, zIndex: 1000, padding: '8px', maxHeight: '400px', overflowY: 'auto', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
+                    {customers.filter(c => {
+                      const q = searchQuery.toLowerCase().trim();
+                      return String(c.name || "").toLowerCase().includes(q) || 
+                             String(c.phone || "").includes(q) || 
+                             String(c.vehicleNumber || "").toLowerCase().includes(q) ||
+                             String(c.id || "").toLowerCase().includes(q);
+                    }).slice(0, 8).map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          setActiveTab('customers');
+                          setSearchQuery(c.name);
+                          setShowResults(false);
+                        }}
+                        style={{ width: '100%', textAlign: 'left', padding: '12px', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                      >
+                        <div>
+                          <p className="font-black" style={{ fontSize: '14px', color: 'var(--text-main)' }}>{c.name}</p>
+                          <p className="label" style={{ fontSize: '10px', margin: 0 }}>{c.vehicleNumber} • {c.phone}</p>
+                        </div>
+                        <span className="badge" style={{ fontSize: '9px' }}>{c.id}</span>
+                      </button>
+                    ))}
+                    {customers.filter(c => {
+                      const q = searchQuery.toLowerCase().trim();
+                      return String(c.name || "").toLowerCase().includes(q) || 
+                             String(c.phone || "").includes(q) || 
+                             String(c.vehicleNumber || "").toLowerCase().includes(q) ||
+                             String(c.id || "").toLowerCase().includes(q);
+                    }).length === 0 && (
+                      <p className="label" style={{ textAlign: 'center', padding: '16px' }}>No matches found</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             
             {activeTab !== 'new-loan' && (
               <button onClick={() => setActiveTab('new-loan')} className="btn-primary" style={{ padding: '0 24px', height: '48px', width: 'auto', fontSize: '12px' }}>
@@ -219,12 +285,23 @@ const App = () => {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-              {activeTab === 'dashboard' && <Dashboard customers={customers} />}
+              {activeTab === 'dashboard' && (
+                <Dashboard 
+                  customers={customers} 
+                  searchQuery={searchQuery} 
+                  onNavigateToCustomer={(name) => {
+                    setActiveTab('customers');
+                    setSearchQuery(name);
+                    setShowResults(false);
+                  }}
+                />
+              )}
               {activeTab === 'new-loan' && <LoanRegistration onAdd={addLoan} onUpdate={updateCustomer} editingCustomer={editingCustomer} onCancel={() => { setEditingCustomer(null); setActiveTab('customers'); }} />}
               {activeTab === 'customers' && <CustomerDatabase customers={customers.filter(c => c.status !== 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport} onRefinance={handleRefinance} onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} />}
-              {activeTab === 'collections' && <CollectionSheet customers={customers} onPay={recordPayment} />}
-              {activeTab === 'ledger' && <Ledger customers={customers} />}
-              {activeTab === 'partial-dues' && <CustomerDatabase customers={customers.filter(c => c.partialEMIPaid > 0)} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport} onRefinance={handleRefinance} onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} isPartialView={true} />}
+              {activeTab === 'collections' && <CollectionSheet customers={customers} onPay={recordPayment} searchQuery={searchQuery} />}
+              {activeTab === 'pending' && <CustomerDatabase customers={customers.filter(c => c.partialEMIPaid > 0)} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport} onRefinance={handleRefinance} onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} isPartialView={true} onPay={recordPayment} />}
+              {activeTab === 'ledger' && <Ledger customers={customers} searchQuery={searchQuery} />}
+              {activeTab === 'reports' && <PaymentReports customers={customers} />}
               {activeTab === 'closed' && <CustomerDatabase customers={customers.filter(c => c.status === 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport} onRefinance={handleRefinance} onAdd={addLoan} onEdit={handleEdit} isClosedView={true} />}
             </motion.div>
           </AnimatePresence>

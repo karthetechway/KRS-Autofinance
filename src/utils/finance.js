@@ -34,9 +34,13 @@ export const calculateEMI = (principal, rate, months) => {
 export const calculateLateFees = (dueDate) => {
   const today = new Date();
   const due = new Date(dueDate);
+  // User request: wait 1 month + 3 days grace
+  const graceDate = new Date(due);
+  graceDate.setMonth(graceDate.getMonth() + 1);
+  graceDate.setDate(graceDate.getDate() + 3);
 
-  if (isAfter(today, due)) {
-    const days = differenceInDays(today, due);
+  if (isAfter(today, graceDate)) {
+    const days = differenceInDays(today, graceDate);
     return {
       days,
       amount: days * 10 // ₹10 per day

@@ -3,22 +3,31 @@ import { IndianRupee, Calendar, AlertTriangle, ArrowRight, Save, ClipboardList, 
 import { format, isAfter, addMonths } from 'date-fns';
 import { calculateLateFees } from '../utils/finance';
 
-const CollectionSheet = ({ customers, onPay }) => {
+const CollectionSheet = ({ customers, onPay, searchQuery }) => {
   const [selected, setSelected] = useState(null);
   const [amount, setAmount] = useState('');
   const [showReceipt, setShowReceipt] = useState(null);
   const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [search, setSearch] = useState('');
   const [emiPaid, setEmiPaid] = useState('');
   const [lateFeesPaid, setLateFeesPaid] = useState('');
 
-  const filteredCustomers = customers.filter(c => 
-    c.status === 'active' && (
-      (c.name || "").toLowerCase().includes((search || "").toLowerCase()) ||
-      (c.phone || "").includes(search || "") ||
-      (c.vehicleNumber || "").toLowerCase().includes((search || "").toLowerCase())
-    )
-  );
+  const filteredCustomers = customers.filter(c => {
+    const query = (searchQuery || "").toLowerCase().trim();
+    if (!query) return c.status === 'active';
+    const name = String(c.name || "").toLowerCase();
+    const phone = String(c.phone || "").replace(/[^0-9]/g, "");
+    const vehicle = String(c.vehicleNumber || "").toLowerCase();
+    const id = String(c.id || "").toLowerCase();
+    const cleanQuery = query.replace(/[^0-9]/g, "");
+    
+    return c.status === 'active' && (
+      name.includes(query) || 
+      (cleanQuery && phone.includes(cleanQuery)) || 
+      phone.includes(query) || 
+      vehicle.includes(query) || 
+      id.includes(query)
+    );
+  });
 
   const handlePay = (e) => {
     e.preventDefault();
@@ -149,20 +158,6 @@ const CollectionSheet = ({ customers, onPay }) => {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: '40px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <div className="card" style={{ padding: '32px', marginBottom: '20px', border: '1px solid var(--accent-main)' }}>
-           <p className="label" style={{ marginBottom: '16px' }}>Search Customer for Collection</p>
-           <div style={{ position: 'relative' }}>
-              <Search className="text-muted" size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
-              <input 
-                type="text" 
-                placeholder="Search by Name, Phone, or Vehicle Number..." 
-                className="input-modern" 
-                style={{ paddingLeft: '48px', height: '56px', fontSize: '18px' }}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-           </div>
-        </div>
 
         {filteredCustomers.map((c) => {
           const isOverdue = isAfter(new Date(), new Date(c.nextDueDate));

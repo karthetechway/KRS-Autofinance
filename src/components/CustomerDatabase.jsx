@@ -4,7 +4,7 @@ import { parseCSVData, calculateRefinance } from '../utils/finance';
 import { format } from 'date-fns';
 import LoanRegistration from './LoanRegistration';
 
-const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, onRefinance, onAdd, onEdit, onCloseAccount, isClosedView = false, isPartialView = false }) => {
+const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, onRefinance, onAdd, onEdit, onCloseAccount, isClosedView = false, isPartialView = false, onPay }) => {
   const [showImport, setShowImport] = useState(false);
   const [showDetails, setShowDetails] = useState(null);
   const [showRefinance, setShowRefinance] = useState(null);
@@ -46,11 +46,21 @@ const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, on
     window.open(`https://wa.me/91${c.phone}?text=${text}`, '_blank');
   };
 
-  const filtered = (customers || []).filter(c => 
-    (c.name || "").toLowerCase().includes((searchQuery || "").toLowerCase()) ||
-    (c.vehicleNumber || "").toLowerCase().includes((searchQuery || "").toLowerCase()) ||
-    (c.phone || "").includes(searchQuery || "")
-  );
+  const filtered = (customers || []).filter(c => {
+    const query = (searchQuery || "").toLowerCase().trim();
+    if (!query) return true;
+    const name = String(c.name || "").toLowerCase();
+    const phone = String(c.phone || "").replace(/[^0-9]/g, "");
+    const vehicle = String(c.vehicleNumber || "").toLowerCase();
+    const id = String(c.id || "").toLowerCase();
+    const cleanQuery = query.replace(/[^0-9]/g, "");
+    
+    return name.includes(query) || 
+           (cleanQuery && phone.includes(cleanQuery)) || 
+           phone.includes(query) || 
+           vehicle.includes(query) || 
+           id.includes(query);
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
@@ -60,16 +70,6 @@ const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, on
           <p className="label">Total {customers.length} records in system</p>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div style={{ position: 'relative' }}>
-            <Search className="text-muted" size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input 
-              className="input-modern" 
-              style={{ paddingLeft: '40px', height: '44px', width: '300px' }} 
-              placeholder="Search by Name, Vehicle or Phone..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
-            />
-          </div>
           <button className="btn-primary" style={{ width: 'auto', padding: '0 20px', height: '44px', background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
             <Download size={16} /> Export Ledger
           </button>
@@ -175,7 +175,25 @@ const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, on
                     >
                       <FileText size={14} />
                     </button>
-                    {c.status === 'active' && (
+                    {isPartialView && (
+                      <button 
+                        onClick={() => {
+                          const balance = parseFloat(c.emiAmount) - (parseFloat(c.partialEMIPaid) || 0);
+                          if(window.confirm(`Pay remaining balance of ₹${balance.toLocaleString()}?`)) {
+                            onPay(c.id, {
+                              amount: balance,
+                              lateFees: 0,
+                              date: new Date().toISOString().split('T')[0]
+                            });
+                          }
+                        }}
+                        title="Pay Balance"
+                        style={{ background: 'var(--accent-main)', border: 'none', padding: '8px', borderRadius: '8px', color: '#000', cursor: 'pointer', fontWeight: 'bold', fontSize: '10px' }}
+                      >
+                        PAY BALANCE
+                      </button>
+                    )}
+                    {!isPartialView && !isClosedView && (
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button 
                           onClick={() => sendReminder(c)}
@@ -298,7 +316,11 @@ const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, on
             <div style={{ padding: '24px', borderBottom: '1px solid var(--border)' }}>
               <h3 className="h3">{showDetails.name} <span className="text-muted" style={{ fontSize: '12px' }}>Vault</span></h3>
             </div>
-            <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+              <div className="card" style={{ padding: '16px' }}>
+                <p className="label">Customer Photo</p>
+                {showDetails.photo ? <img src={showDetails.photo} style={{ width: '100%', borderRadius: '12px' }} alt="" /> : <p className="text-muted">No photo</p>}
+              </div>
               <div className="card" style={{ padding: '16px' }}>
                 <p className="label">Aadhar</p>
                 {showDetails.aadharFile ? <img src={showDetails.aadharFile} style={{ width: '100%', borderRadius: '12px' }} alt="" /> : <p className="text-muted">No document</p>}
