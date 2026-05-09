@@ -1,35 +1,58 @@
 import React, { useState } from 'react';
-import { Camera, ShieldCheck, FileText, IndianRupee, Calendar, User, Phone, MapPin, Bike, Calculator, Zap, CheckCircle2 } from 'lucide-react';
+import { Camera, ShieldCheck, FileText, IndianRupee, Calendar, User, Phone, MapPin, Bike, Calculator, Zap, CheckCircle2, Loader2 } from 'lucide-react';
 import { calculateEMI } from '../utils/finance';
 import { format } from 'date-fns';
+import { storage } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
   const [tab, setTab] = useState('new');
+  const [isUploading, setIsUploading] = useState(false);
   const initialForm = {
     name: '', phone: '', address: '', aadhar: '',
     vehicleModel: '', vehicleNumber: '', modelYear: format(new Date(), 'yyyy'),
     loanAmount: '', interestRate: '', emiMonths: '',
     docCharge: '10', paidEMI: 0, nextDueDate: format(new Date(), 'yyyy-MM-dd'),
-    photo: null, photoName: '', aadharFile: null, aadharName: '', rcFile: null, rcName: ''
+    photo: null, photoName: '', 
+    rcFront: null, rcFrontName: '', rcBack: null, rcBackName: '',
+    aadharFront: null, aadharFrontName: '', aadharBack: null, aadharBackName: ''
   };
   const [formData, setFormData] = useState(initialForm);
+  const [fileObjects, setFileObjects] = useState({}); // To store raw File objects
 
   React.useEffect(() => {
     if (editingCustomer) {
       setFormData({ ...initialForm, ...editingCustomer });
-      setTab(editingCustomer.paidEMI > 0 ? 'migrate' : 'new');
+      setTab('migrate'); // Always go to Migrate when editing from ledger
     }
   }, [editingCustomer]);
 
   const handleTabChange = (newTab) => {
+    if (newTab === tab) return;
+
+    // Check if any major field is filled to determine if "typing" has happened
+    const hasData = formData.name || formData.phone || formData.vehicleNumber || (formData.loanAmount && formData.loanAmount !== '');
+
+    if (hasData) {
+      if (!window.confirm("You were typing! If you move from here, the data will reset. Continue?")) {
+        return;
+      }
+    }
+
     setTab(newTab);
-    if (!editingCustomer) {
-      setFormData(initialForm);
+    setFormData(initialForm);
+    setFileObjects({});
+    
+    // If we were editing a customer and switched to a different tab, cancel the edit mode
+    if (editingCustomer) {
+      onCancel();
     }
   };
 
   const handleFile = (field, file) => {
     if (!file) return;
+    
+    // Preview locally
     const reader = new FileReader();
     reader.onload = (e) => setFormData(prev => ({ 
       ...prev, 
@@ -37,17 +60,56 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
       [`${field.replace('File', '')}Name`]: file.name 
     }));
     reader.readAsDataURL(file);
+
+    // Save actual file object for later upload
+    setFileObjects(prev => ({ ...prev, [field]: file }));
   };
 
-  const handleSubmit = (e) => {
+  const uploadFile = async (field, file) => {
+    if (!file || typeof file === 'string') return file; // Already a URL or empty
+    const storageRef = ref(storage, `documents/${formData.phone || 'unknown'}/${field}_${Date.now()}`);
+    const snapshot = await uploadBytes(storageRef, file);
+    return await getDownloadURL(snapshot.ref);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const emiDetails = calculateEMI(formData.loanAmount, formData.interestRate, formData.emiMonths);
-    const finalData = { ...formData, ...emiDetails, emiAmount: emiDetails.emi };
+    setIsUploading(true);
     
-    if (editingCustomer) {
-      onUpdate(finalData);
-    } else {
-      onAdd(finalData);
+    try {
+      // Upload all new files
+      const uploadTasks = [
+        uploadFile('photo', fileObjects.photo),
+        uploadFile('rcFront', fileObjects.rcFront),
+        uploadFile('rcBack', fileObjects.rcBack),
+        uploadFile('aadharFront', fileObjects.aadharFront),
+        uploadFile('aadharBack', fileObjects.aadharBack),
+      ];
+
+      const [photoUrl, rcFrontUrl, rcBackUrl, aadharFrontUrl, aadharBackUrl] = await Promise.all(uploadTasks);
+
+      const emiDetails = calculateEMI(formData.loanAmount, formData.interestRate, formData.emiMonths);
+      const finalData = { 
+        ...formData, 
+        ...emiDetails, 
+        emiAmount: emiDetails.emi,
+        photo: photoUrl || formData.photo,
+        rcFront: rcFrontUrl || formData.rcFront,
+        rcBack: rcBackUrl || formData.rcBack,
+        aadharFront: aadharFrontUrl || formData.aadharFront,
+        aadharBack: aadharBackUrl || formData.aadharBack
+      };
+      
+      if (editingCustomer && editingCustomer.id) {
+        onUpdate(finalData);
+      } else {
+        onAdd(finalData);
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+      alert("Document upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -75,21 +137,33 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
 
           <div>
              <p className="label">Step 2: Identity & Assets</p>
-             <div className="upload-grid">
+             <div className="upload-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
                  <div className={`file-upload-card ${formData.photo ? 'has-file' : ''}`}>
                     <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFile('photo', e.target.files[0])} />
-                    <div className="icon-container">{formData.photo ? <CheckCircle2 size={32} /> : <Camera size={32} />}</div>
+                    <div className="icon-container">{formData.photo ? <CheckCircle2 size={24} /> : <Camera size={24} />}</div>
                     <span>{formData.photoName || 'Customer Photo'}</span>
                  </div>
-                 <div className={`file-upload-card ${formData.aadharFile ? 'has-file' : ''}`}>
-                    <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFile('aadharFile', e.target.files[0])} />
-                    <div className="icon-container">{formData.aadharFile ? <CheckCircle2 size={32} /> : <ShieldCheck size={32} />}</div>
-                    <span>{formData.aadharName || 'Aadhar ID'}</span>
+                 
+                 <div className={`file-upload-card ${formData.rcFront ? 'has-file' : ''}`}>
+                    <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFile('rcFront', e.target.files[0])} />
+                    <div className="icon-container">{formData.rcFront ? <CheckCircle2 size={24} /> : <FileText size={24} />}</div>
+                    <span>{formData.rcFrontName || 'RC Front'}</span>
                  </div>
-                 <div className={`file-upload-card ${formData.rcFile ? 'has-file' : ''}`}>
-                    <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFile('rcFile', e.target.files[0])} />
-                    <div className="icon-container">{formData.rcFile ? <CheckCircle2 size={32} /> : <FileText size={32} />}</div>
-                    <span>{formData.rcName || 'RC Book'}</span>
+                 <div className={`file-upload-card ${formData.rcBack ? 'has-file' : ''}`}>
+                    <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFile('rcBack', e.target.files[0])} />
+                    <div className="icon-container">{formData.rcBack ? <CheckCircle2 size={24} /> : <FileText size={24} />}</div>
+                    <span>{formData.rcBackName || 'RC Back'}</span>
+                 </div>
+
+                 <div className={`file-upload-card ${formData.aadharFront ? 'has-file' : ''}`}>
+                    <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFile('aadharFront', e.target.files[0])} />
+                    <div className="icon-container">{formData.aadharFront ? <CheckCircle2 size={24} /> : <ShieldCheck size={24} />}</div>
+                    <span>{formData.aadharFrontName || 'Aadhar Front'}</span>
+                 </div>
+                 <div className={`file-upload-card ${formData.aadharBack ? 'has-file' : ''}`}>
+                    <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFile('aadharBack', e.target.files[0])} />
+                    <div className="icon-container">{formData.aadharBack ? <CheckCircle2 size={24} /> : <ShieldCheck size={24} />}</div>
+                    <span>{formData.aadharBackName || 'Aadhar Back'}</span>
                  </div>
              </div>
           </div>
@@ -158,7 +232,7 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
                       />
                     </div>
                     <div className="input-group">
-                      <label className="label">Last Payment Date</label>
+                      <label className="label">Next EMI Due Date</label>
                       <input required className="input-modern" type="date" value={formData.nextDueDate} onChange={(e) => setFormData({...formData, nextDueDate: e.target.value})} />
                     </div>
                  </div>
@@ -186,8 +260,12 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
                    Cancel
                  </button>
                )}
-               <button type="submit" className="btn-primary" style={{ flex: 1 }}>
-                  {editingCustomer ? 'Update Contract' : 'Confirm & Save Contract'} <Zap size={18} />
+               <button type="submit" className="btn-primary" style={{ flex: 1 }} disabled={isUploading}>
+                  {isUploading ? (
+                    <><Loader2 className="animate-spin" size={18} /> UPLOADING DOCUMENTS...</>
+                  ) : (
+                    <>{editingCustomer && editingCustomer.id ? 'Update Contract' : 'Confirm & Save Contract'} <Zap size={18} /></>
+                  )}
                </button>
             </div>
           </div>

@@ -1,19 +1,25 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Lock, User, ArrowRight, AlertCircle } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { auth } from '../firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { Lock, Mail, Zap, Loader2 } from 'lucide-react';
 
-const Login = ({ onLogin }) => {
+const Login = () => {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    // Default demo password is 'admin' or any non-empty for this demo
-    if (password === '1234') {
-      onLogin();
-    } else {
-      setError(true);
-      setTimeout(() => setError(false), 2000);
+    setLoading(true);
+    setError('');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      setError('Invalid credentials. Please check your email and password.');
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -24,78 +30,88 @@ const Login = ({ onLogin }) => {
       alignItems: 'center', 
       justifyContent: 'center', 
       background: 'var(--bg-app)',
-      padding: '24px'
+      padding: '20px'
     }}>
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="card" 
-        style={{ maxWidth: '540px', width: '100%', padding: '64px', position: 'relative', overflow: 'hidden' }}
-      >
-        <div style={{ 
-          position: 'absolute', 
-          top: 0, left: 0, right: 0, height: '4px', 
-          background: 'linear-gradient(90deg, var(--accent-main), transparent)' 
-        }}></div>
-
+      <div className="animate-fade" style={{ 
+        width: '100%', 
+        maxWidth: '440px', 
+        background: 'var(--bg-card)', 
+        border: '1px solid var(--border)', 
+        borderRadius: '32px',
+        padding: '48px',
+        boxShadow: '0 40px 100px rgba(0,0,0,0.5)'
+      }}>
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{ margin: '0 auto 16px', height: '120px', display: 'flex', justifyContent: 'center' }}>
-            <img src={`${import.meta.env.BASE_URL}logo.jpg`} alt="Logo" style={{ height: '100%', width: 'auto', objectFit: 'contain' }} />
+          <div className="brand-icon" style={{ 
+            width: '80px', 
+            height: '80px', 
+            margin: '0 auto 24px', 
+            borderRadius: '24px',
+            background: 'linear-gradient(135deg, var(--accent-main), #ff6b81)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff'
+          }}>
+            <Lock size={32} />
           </div>
-          <p className="label" style={{ margin: '0 0 40px' }}>Terminal Access Portal</p>
+          <h1 className="h2" style={{ marginBottom: '8px' }}>KRS Control Panel</h1>
+          <p className="label" style={{ margin: 0 }}>Secure access for administrators only</p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div className="input-group" style={{ marginBottom: 0 }}>
-            <label className="label">System Identity</label>
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div className="input-group" style={{ margin: 0 }}>
+            <label className="label">Work Email</label>
             <div style={{ position: 'relative' }}>
-              <User size={16} className="text-muted" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+              <Mail size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input 
+                required 
+                type="email" 
                 className="input-modern" 
                 style={{ paddingLeft: '48px' }} 
-                defaultValue="Administrator" 
-                readOnly 
+                placeholder="name@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
           </div>
 
-          <div className="input-group" style={{ marginBottom: 0 }}>
-            <label className="label">Access Password</label>
+          <div className="input-group" style={{ margin: 0 }}>
+            <label className="label">Security Password</label>
             <div style={{ position: 'relative' }}>
-              <Lock size={16} className="text-muted" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+              <Lock size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input 
-                className="input-modern" 
-                style={{ paddingLeft: '48px', borderColor: error ? 'var(--error)' : 'var(--border)' }} 
+                required 
                 type="password" 
+                className="input-modern" 
+                style={{ paddingLeft: '48px' }} 
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoFocus
               />
             </div>
           </div>
 
           {error && (
-            <motion.div 
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--error)', fontSize: '14px', fontWeight: 800 }}
-            >
-              <AlertCircle size={14} /> INVALID ACCESS KEY
-            </motion.div>
+            <p style={{ color: 'var(--accent-main)', fontSize: '13px', fontWeight: 'bold', textAlign: 'center' }}>
+              {error}
+            </p>
           )}
 
-          <button type="submit" className="btn-primary" style={{ marginTop: '12px' }}>
-            Authorize Entry <ArrowRight size={18} />
+          <button 
+            type="submit" 
+            className="btn-primary" 
+            disabled={loading}
+            style={{ marginTop: '12px' }}
+          >
+            {loading ? <Loader2 className="animate-spin" size={20} /> : <>SIGN IN TO SYSTEM <Zap size={18} /></>}
           </button>
         </form>
 
-        <div style={{ marginTop: '40px', textAlign: 'center' }}>
-          <p className="text-muted" style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            SECURED BY END-TO-END ENCRYPTION
-          </p>
-        </div>
-      </motion.div>
+        <p className="label" style={{ textAlign: 'center', marginTop: '32px', opacity: 0.5 }}>
+          Authorized Personnel Only
+        </p>
+      </div>
     </div>
   );
 };

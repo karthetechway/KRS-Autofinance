@@ -34,10 +34,9 @@ export const calculateEMI = (principal, rate, months) => {
 export const calculateLateFees = (dueDate) => {
   const today = new Date();
   const due = new Date(dueDate);
-  // User request: wait 1 month + 3 days grace
+  // Rule: 5 days grace from the due date
   const graceDate = new Date(due);
-  graceDate.setMonth(graceDate.getMonth() + 1);
-  graceDate.setDate(graceDate.getDate() + 3);
+  graceDate.setDate(graceDate.getDate() + 5);
 
   if (isAfter(today, graceDate)) {
     const days = differenceInDays(today, graceDate);
@@ -67,20 +66,35 @@ export const parseCSVData = (text) => {
 
 
 
-export const calculateRefinance = (customer, topUpAmount) => {
-  const remainingMonths = customer.emiMonths - customer.paidEMI;
-  const principalPerMonth = parseFloat(customer.loanAmount) / customer.emiMonths;
+
+export const calculatePreClosure = (customer) => {
+  const today = new Date();
+  const nextDue = new Date(customer.nextDueDate);
+  const lastDue = new Date(nextDue);
+  lastDue.setMonth(lastDue.getMonth() - 1);
+
+  const originalPrincipal = parseFloat(customer.loanAmount) || 0;
+  const emiMonths = parseFloat(customer.emiMonths) || 0;
+  const principalPerMonth = originalPrincipal / emiMonths;
+  const remainingMonths = emiMonths - customer.paidEMI;
   const outstandingPrincipal = principalPerMonth * remainingMonths;
-  const topUp = parseFloat(topUpAmount) || 0;
-  const docCharge = topUp * 0.10;
-  const newTotalLoan = outstandingPrincipal + topUp;
+  
+  // 7.5% of original principal amount
+  const preClosureCharges = originalPrincipal * 0.075;
+  const lateFees = calculateLateFees(customer.nextDueDate).amount;
+  
+  const daysUsed = Math.max(0, differenceInDays(today, lastDue));
+  const proRataEMI = (parseFloat(customer.emiAmount) / 30) * daysUsed;
+  
+  const total = outstandingPrincipal + preClosureCharges + lateFees + proRataEMI;
   
   return {
     outstandingPrincipal: Math.round(outstandingPrincipal),
-    newTotalLoan: Math.round(newTotalLoan),
-    topUpAmount: topUp,
-    docCharge: Math.round(docCharge),
-    amountToHandover: Math.round(topUp - docCharge),
-    remainingMonths: remainingMonths
+    originalPrincipal: Math.round(originalPrincipal),
+    preClosureCharges: Math.round(preClosureCharges),
+    lateFees: Math.round(lateFees),
+    proRataEMI: Math.round(proRataEMI),
+    daysUsed,
+    totalAmount: Math.round(total)
   };
 };

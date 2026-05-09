@@ -14,10 +14,15 @@ import {
   ShieldCheck,
   FileCheck,
   Menu,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
 import { format, isToday, addMonths } from 'date-fns';
-import { calculateEMI } from './utils/finance';
+
+// Firebase
+import { auth, db } from './firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { collection, onSnapshot, addDoc, updateDoc, doc, query, orderBy } from 'firebase/firestore';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -27,112 +32,131 @@ import CustomerDatabase from './components/CustomerDatabase';
 import CollectionSheet from './components/CollectionSheet';
 import Ledger from './components/Ledger';
 import PaymentReports from './components/PaymentReports';
-import Analytics from './components/Analytics';
 import Login from './components/Login';
-import ImportPortal from './components/ImportPortal';
 
 const App = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return localStorage.getItem('krs_auth') === 'true';
-  });
-  
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [customers, setCustomers] = useState([]);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [customers, setCustomers] = useState(() => {
-    const saved = localStorage.getItem('krs_customers');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
   const [showBriefing, setShowBriefing] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Authentication Tracking
   useEffect(() => {
-    localStorage.setItem('krs_customers', JSON.stringify(customers));
-  }, [customers]);
-
-  const handleLogin = () => {
-    setIsLoggedIn(true);
-    localStorage.setItem('krs_auth', 'true');
-    setShowBriefing(true);
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    localStorage.setItem('krs_auth', 'false');
-  };
-
-  const addLoan = (loanData) => {
-    const newCustomer = {
-      id: `KRS-${Math.floor(1000 + Math.random() * 9000)}`,
-      ...loanData,
-      status: 'active',
-      onboardingDate: new Date().toISOString(),
-      paymentHistory: []
-    };
-    setCustomers([...customers, newCustomer]);
-    setActiveTab('customers');
-  };
-
-  const recordPayment = (customerId, paymentData) => {
-    // paymentData: { emiPaid, lateFeesPaid, date }
-    const updated = customers.map(c => {
-      if (c.id === customerId) {
-        let { paidEMI, partialEMIPaid = 0, nextDueDate, totalLateFeesPaid = 0 } = c;
-        const emiPaidNow = parseFloat(paymentData.emiPaid || 0);
-        const lateFeesPaidNow = parseFloat(paymentData.lateFeesPaid || 0);
-        
-        // Handle EMI Payment (Partial support)
-        let totalEMIContributed = (parseFloat(partialEMIPaid) || 0) + emiPaidNow;
-        const emiCost = parseFloat(c.emiAmount);
-        
-        let installmentsAdded = 0;
-        while (totalEMIContributed >= emiCost && paidEMI < c.emiMonths) {
-          paidEMI += 1;
-          totalEMIContributed -= emiCost;
-          installmentsAdded += 1;
-          // Update due date
-          nextDueDate = format(addMonths(new Date(nextDueDate), 1), 'yyyy-MM-dd');
-        }
-        
-        return {
-          ...c,
-          paidEMI,
-          partialEMIPaid: totalEMIContributed,
-          nextDueDate,
-          totalLateFeesPaid: (parseFloat(totalLateFeesPaid) || 0) + lateFeesPaidNow,
-          paymentHistory: [
-            {
-              id: `KRS-${Date.now().toString().slice(-6)}`,
-              date: paymentData.date,
-              amount: emiPaidNow + lateFeesPaidNow,
-              emiPaid: emiPaidNow,
-              lateFeesPaid: lateFeesPaidNow,
-              type: installmentsAdded > 0 ? 'EMI Payment' : 'Partial Payment',
-              customerName: c.name,
-              vehicleNumber: c.vehicleNumber
-            },
-            ...c.paymentHistory
-          ]
-        };
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setAuthLoading(false);
+      if (user) {
+        setShowBriefing(true);
       }
-      return c;
     });
-    setCustomers(updated);
+    return () => unsubscribe();
+  }, []);
+
+  // Real-time Firestore Sync
+  useEffect(() => {
+    if (!user) {
+      setCustomers([]);
+      return;
+    }
+    
+    const q = query(collection(db, "customers"), orderBy("onboardingDate", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      }));
+      setCustomers(data);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const addLoan = async (loanData) => {
+    try {
+      const newCustomer = {
+        ...loanData,
+        status: 'active',
+        onboardingDate: new Date().toISOString(),
+        paymentHistory: [],
+        partialEMIPaid: 0,
+        customId: `KRS-${Math.floor(1000 + Math.random() * 9000)}`
+      };
+      await addDoc(collection(db, "customers"), newCustomer);
+      setActiveTab('customers');
+    } catch (err) {
+      console.error("Error adding loan:", err);
+      alert("Failed to save to cloud. Check internet connection.");
+    }
   };
 
-  const closeAccount = (customerId) => {
-    const updated = customers.map(c => 
-      c.id === customerId ? { ...c, status: 'closed', closureDate: new Date().toISOString() } : c
-    );
-    setCustomers(updated);
+  const updateCustomer = async (updatedData) => {
+    try {
+      const { id, ...data } = updatedData;
+      await updateDoc(doc(db, "customers", id), data);
+      setEditingCustomer(null);
+      setActiveTab('customers');
+    } catch (err) {
+      console.error("Error updating customer:", err);
+    }
   };
 
-  const updateCustomer = (updatedData) => {
-    const updated = customers.map(c => c.id === updatedData.id ? { ...c, ...updatedData } : c);
-    setCustomers(updated);
-    setEditingCustomer(null);
-    setActiveTab('customers');
+  const recordPayment = async (customerId, paymentData) => {
+    try {
+      const customer = customers.find(c => c.id === customerId);
+      if (!customer) return;
+
+      let { paidEMI, partialEMIPaid = 0, nextDueDate, totalLateFeesPaid = 0 } = customer;
+      const emiPaidNow = parseFloat(paymentData.emiPaid || 0);
+      const lateFeesPaidNow = parseFloat(paymentData.lateFeesPaid || 0);
+      
+      let totalEMIContributed = (parseFloat(partialEMIPaid) || 0) + emiPaidNow;
+      const emiCost = parseFloat(customer.emiAmount);
+      
+      let installmentsAdded = 0;
+      while (totalEMIContributed >= emiCost && paidEMI < customer.emiMonths) {
+        paidEMI += 1;
+        totalEMIContributed -= emiCost;
+        installmentsAdded += 1;
+        nextDueDate = format(addMonths(new Date(nextDueDate), 1), 'yyyy-MM-dd');
+      }
+
+      const paymentRecord = {
+        id: `PAY-${Date.now().toString().slice(-6)}`,
+        date: paymentData.date,
+        amount: emiPaidNow + lateFeesPaidNow,
+        emiPaid: emiPaidNow,
+        lateFeesPaid: lateFeesPaidNow,
+        type: installmentsAdded > 0 ? 'EMI Payment' : 'Partial Payment',
+        customerName: customer.name,
+        vehicleNumber: customer.vehicleNumber
+      };
+
+      await updateDoc(doc(db, "customers", customerId), {
+        paidEMI,
+        partialEMIPaid: totalEMIContributed,
+        nextDueDate,
+        totalLateFeesPaid: (parseFloat(totalLateFeesPaid) || 0) + lateFeesPaidNow,
+        paymentHistory: [paymentRecord, ...(customer.paymentHistory || [])]
+      });
+    } catch (err) {
+      console.error("Error recording payment:", err);
+    }
+  };
+
+  const closeAccount = async (customerId, closureData) => {
+    try {
+      await updateDoc(doc(db, "customers", customerId), {
+        status: 'closed',
+        ...closureData
+      });
+    } catch (err) {
+      console.error("Error closing account:", err);
+    }
   };
 
   const handleEdit = (customer) => {
@@ -140,42 +164,31 @@ const App = () => {
     setActiveTab('new-loan');
   };
 
-  const handleRefinance = (customerId, refinanceData) => {
-    // 1. Find the old customer
-    const oldCustomer = customers.find(c => c.id === customerId);
-    if (!oldCustomer) return;
-
-    // 2. Mark old customer as closed
-    const updatedCustomers = customers.map(c => 
-      c.id === customerId ? { ...c, status: 'closed' } : c
-    );
-
-    // 3. Create new customer entry
-    const newId = `KRS-${Math.floor(1000 + Math.random() * 9000)}`;
-    const emiDetails = calculateEMI(refinanceData.newTotalLoan, oldCustomer.interestRate, oldCustomer.emiMonths);
-    
-    const newCustomer = {
-      ...oldCustomer,
-      id: newId,
-      loanAmount: refinanceData.newTotalLoan,
-      paidEMI: 0,
-      nextDueDate: format(new Date(), 'yyyy-MM-dd'),
-      paymentHistory: [],
-      status: 'active',
-      refinancedFrom: oldCustomer.id,
-      ...emiDetails,
-      emiAmount: emiDetails.emi
-    };
-
-    setCustomers([...updatedCustomers, newCustomer]);
-    setActiveTab('customers');
+  const handleImport = async (importedData) => {
+    try {
+      for (const item of importedData) {
+        await addDoc(collection(db, "customers"), {
+          ...item,
+          status: item.status || 'active',
+          onboardingDate: item.onboardingDate || new Date().toISOString(),
+          paymentHistory: item.paymentHistory || [],
+          partialEMIPaid: item.partialEMIPaid || 0
+        });
+      }
+    } catch (err) {
+      console.error("Error importing:", err);
+    }
   };
 
-  const handleImport = (importedData) => {
-    setCustomers([...customers, ...importedData]);
-  };
+  const handleLogout = () => signOut(auth);
 
-  if (!isLoggedIn) return <Login onLogin={handleLogin} />;
+  if (authLoading) return (
+    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-app)' }}>
+      <Loader2 className="animate-spin" color="var(--accent-main)" size={48} />
+    </div>
+  );
+
+  if (!user) return <Login />;
 
   return (
     <div className={`app-shell ${isSidebarOpen ? 'sidebar-open' : ''}`}>
@@ -190,6 +203,12 @@ const App = () => {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
+      {isSidebarOpen && (
+        <div 
+          className="sidebar-backdrop" 
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
       
       <main className="main-container">
         <header className="header">
@@ -197,7 +216,6 @@ const App = () => {
             <button 
               className="mobile-menu-btn" 
               onClick={() => setIsSidebarOpen(true)}
-              style={{ display: 'none' }}
             >
               <Menu size={24} />
             </button>
@@ -236,7 +254,7 @@ const App = () => {
                       return String(c.name || "").toLowerCase().includes(q) || 
                              String(c.phone || "").includes(q) || 
                              String(c.vehicleNumber || "").toLowerCase().includes(q) ||
-                             String(c.id || "").toLowerCase().includes(q);
+                             String(c.customId || "").toLowerCase().includes(q);
                     }).slice(0, 8).map(c => (
                       <button
                         key={c.id}
@@ -251,25 +269,23 @@ const App = () => {
                           <p className="font-black" style={{ fontSize: '14px', color: 'var(--text-main)' }}>{c.name}</p>
                           <p className="label" style={{ fontSize: '10px', margin: 0 }}>{c.vehicleNumber} • {c.phone}</p>
                         </div>
-                        <span className="badge" style={{ fontSize: '9px' }}>{c.id}</span>
+                        <span className="badge" style={{ fontSize: '9px' }}>{c.customId || c.id.slice(0,6)}</span>
                       </button>
                     ))}
-                    {customers.filter(c => {
-                      const q = searchQuery.toLowerCase().trim();
-                      return String(c.name || "").toLowerCase().includes(q) || 
-                             String(c.phone || "").includes(q) || 
-                             String(c.vehicleNumber || "").toLowerCase().includes(q) ||
-                             String(c.id || "").toLowerCase().includes(q);
-                    }).length === 0 && (
-                      <p className="label" style={{ textAlign: 'center', padding: '16px' }}>No matches found</p>
-                    )}
                   </div>
                 )}
               </div>
             )}
             
             {activeTab !== 'new-loan' && (
-              <button onClick={() => setActiveTab('new-loan')} className="btn-primary" style={{ padding: '0 24px', height: '48px', width: 'auto', fontSize: '12px' }}>
+              <button 
+                onClick={() => {
+                  setEditingCustomer(null);
+                  setActiveTab('new-loan');
+                }} 
+                className="btn-primary" 
+                style={{ padding: '0 24px', height: '48px', width: 'auto', fontSize: '12px' }}
+              >
                 <Plus size={18} /> NEW RECORD
               </button>
             )}
@@ -297,12 +313,12 @@ const App = () => {
                 />
               )}
               {activeTab === 'new-loan' && <LoanRegistration onAdd={addLoan} onUpdate={updateCustomer} editingCustomer={editingCustomer} onCancel={() => { setEditingCustomer(null); setActiveTab('customers'); }} />}
-              {activeTab === 'customers' && <CustomerDatabase customers={customers.filter(c => c.status !== 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport} onRefinance={handleRefinance} onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} />}
+              {activeTab === 'customers' && <CustomerDatabase customers={customers.filter(c => c.status !== 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport}  onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} />}
               {activeTab === 'collections' && <CollectionSheet customers={customers} onPay={recordPayment} searchQuery={searchQuery} />}
-              {activeTab === 'pending' && <CustomerDatabase customers={customers.filter(c => c.partialEMIPaid > 0)} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport} onRefinance={handleRefinance} onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} isPartialView={true} onPay={recordPayment} />}
+              {activeTab === 'pending' && <CustomerDatabase customers={customers.filter(c => c.partialEMIPaid > 0)} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport}  onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} isPartialView={true} onPay={recordPayment} />}
               {activeTab === 'ledger' && <Ledger customers={customers} searchQuery={searchQuery} />}
               {activeTab === 'reports' && <PaymentReports customers={customers} />}
-              {activeTab === 'closed' && <CustomerDatabase customers={customers.filter(c => c.status === 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport} onRefinance={handleRefinance} onAdd={addLoan} onEdit={handleEdit} isClosedView={true} />}
+              {activeTab === 'closed' && <CustomerDatabase customers={customers.filter(c => c.status === 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport}  onAdd={addLoan} onEdit={handleEdit} isClosedView={true} />}
             </motion.div>
           </AnimatePresence>
         </section>
