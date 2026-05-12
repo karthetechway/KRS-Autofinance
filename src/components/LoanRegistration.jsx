@@ -67,13 +67,29 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
 
   const uploadFile = async (field, file) => {
     if (!file || typeof file === 'string') return file; // Already a URL or empty
-    const storageRef = ref(storage, `documents/${formData.phone || 'unknown'}/${field}_${Date.now()}`);
-    const snapshot = await uploadBytes(storageRef, file);
-    return await getDownloadURL(snapshot.ref);
+    
+    // Ensure phone is present for path, fallback to a unique timestamp if missing
+    const pathId = formData.phone ? formData.phone.trim().replace(/\s+/g, '_') : `anonymous_${Date.now()}`;
+    const uniqueSuffix = Math.random().toString(36).substring(2, 8);
+    const storageRef = ref(storage, `documents/${pathId}/${field}_${Date.now()}_${uniqueSuffix}`);
+    
+    try {
+      const snapshot = await uploadBytes(storageRef, file);
+      return await getDownloadURL(snapshot.ref);
+    } catch (error) {
+      console.error(`Error uploading ${field}:`, error);
+      throw error; // Rethrow to be caught by handleSubmit
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!formData.phone) {
+      alert("Please provide a phone number before uploading documents.");
+      return;
+    }
+
     setIsUploading(true);
     
     try {
@@ -106,8 +122,20 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
         onAdd(finalData);
       }
     } catch (err) {
-      console.error("Upload failed:", err);
-      alert("Document upload failed. Please try again.");
+      console.error("Critical Upload Error:", err);
+      let errorMsg = "Document upload failed. ";
+      
+      if (err.code === 'storage/unauthorized') {
+        errorMsg += "Permission denied. Please check Firebase Storage rules.";
+      } else if (err.code === 'storage/project-not-found') {
+        errorMsg += "Firebase project not found. Check your configuration.";
+      } else if (err.code === 'storage/retry-limit-exceeded') {
+        errorMsg += "Upload timed out. Please check your internet connection.";
+      } else {
+        errorMsg += err.message || "Please try again.";
+      }
+      
+      alert(errorMsg);
     } finally {
       setIsUploading(false);
     }

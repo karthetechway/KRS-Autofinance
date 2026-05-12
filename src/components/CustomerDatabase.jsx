@@ -291,27 +291,47 @@ const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, on
             <div style={{ padding: '24px', borderBottom: '1px solid var(--border)' }}>
               <h3 className="h3">{showDetails.name} <span className="text-muted" style={{ fontSize: '12px' }}>Vault</span></h3>
             </div>
-            <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-              <div className="card" style={{ padding: '16px' }}>
-                <p className="label">Customer Photo</p>
-                {showDetails.photo ? <img src={showDetails.photo} style={{ width: '100%', borderRadius: '12px' }} alt="" /> : <p className="text-muted">No photo</p>}
-              </div>
-              <div className="card" style={{ padding: '16px' }}>
-                <p className="label">RC Book Front</p>
-                {showDetails.rcFront ? <img src={showDetails.rcFront} style={{ width: '100%', borderRadius: '12px' }} alt="" /> : <p className="text-muted">No document</p>}
-              </div>
-              <div className="card" style={{ padding: '16px' }}>
-                <p className="label">RC Book Back</p>
-                {showDetails.rcBack ? <img src={showDetails.rcBack} style={{ width: '100%', borderRadius: '12px' }} alt="" /> : <p className="text-muted">No document</p>}
-              </div>
-              <div className="card" style={{ padding: '16px' }}>
-                <p className="label">Aadhar Front</p>
-                {showDetails.aadharFront ? <img src={showDetails.aadharFront} style={{ width: '100%', borderRadius: '12px' }} alt="" /> : <p className="text-muted">No document</p>}
-              </div>
-              <div className="card" style={{ padding: '16px' }}>
-                <p className="label">Aadhar Back</p>
-                {showDetails.aadharBack ? <img src={showDetails.aadharBack} style={{ width: '100%', borderRadius: '12px' }} alt="" /> : <p className="text-muted">No document</p>}
-              </div>
+            <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+              {[
+                { label: 'Customer Photo', key: 'photo' },
+                { label: 'RC Book Front', key: 'rcFront' },
+                { label: 'RC Book Back', key: 'rcBack' },
+                { label: 'Aadhar Front', key: 'aadharFront' },
+                { label: 'Aadhar Back', key: 'aadharBack' }
+              ].map(doc => (
+                <div key={doc.key} className="card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <p className="label" style={{ margin: 0 }}>{doc.label}</p>
+                  <div style={{ flex: 1, minHeight: '200px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                    {showDetails[doc.key] ? (
+                      showDetails[doc.key].includes('.pdf') || showDetails[doc.key].includes('pdf') ? (
+                        <div style={{ textAlign: 'center', padding: '20px' }}>
+                          <FileText size={48} className="text-accent" style={{ marginBottom: '12px' }} />
+                          <p className="label" style={{ fontSize: '10px', textTransform: 'none', marginBottom: '16px' }}>PDF Document</p>
+                          <a 
+                            href={showDetails[doc.key]} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="btn-primary" 
+                            style={{ height: '36px', padding: '0 16px', fontSize: '11px', width: 'auto' }}
+                          >
+                            Open PDF <ArrowUpRight size={14} />
+                          </a>
+                        </div>
+                      ) : (
+                        <img 
+                          src={showDetails[doc.key]} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                          alt={doc.label} 
+                          onClick={() => window.open(showDetails[doc.key], '_blank')}
+                          className="cursor-pointer"
+                        />
+                      )
+                    ) : (
+                      <p className="label" style={{ opacity: 0.3 }}>Not Uploaded</p>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

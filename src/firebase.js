@@ -7,6 +7,8 @@ const firebaseConfig = {
   apiKey: "AIzaSyD26ViDCZUA8sRzeW4M06eZ6n_ZQRcRHEE",
   authDomain: "krs-autofinance.firebaseapp.com",
   projectId: "krs-autofinance",
+  // Check your Firebase Console -> Storage tab. 
+  // If the bucket name ends in .appspot.com, update this line.
   storageBucket: "krs-autofinance.firebasestorage.app",
   messagingSenderId: "177876354594",
   appId: "1:177876354594:web:df480d26a98f2ac10b6c7b"
