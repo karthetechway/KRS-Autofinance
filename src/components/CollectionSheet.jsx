@@ -33,10 +33,19 @@ const CollectionSheet = ({ customers, onPay, searchQuery }) => {
     e.preventDefault();
     if (!selected) return;
     
+    let finalPaymentDate = new Date(paymentDate);
+    // If the selected date is today, use the current precise time
+    if (format(finalPaymentDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')) {
+      finalPaymentDate = new Date();
+    } else {
+      // For past dates, set to noon to avoid UTC day-flip issues
+      finalPaymentDate.setHours(12, 0, 0, 0);
+    }
+
     onPay(selected.id, {
       emiPaid: emiPaid || 0,
       lateFeesPaid: lateFeesPaid || 0,
-      date: new Date(paymentDate).toISOString(),
+      date: finalPaymentDate.toISOString(),
       isBackfill: isBackfill
     });
     
@@ -65,7 +74,7 @@ const CollectionSheet = ({ customers, onPay, searchQuery }) => {
       emiPaid: emiPaidNow,
       lateFeesPaid: lateFeesPaid || 0,
       instInfo: instInfo,
-      date: new Date(paymentDate).toISOString(),
+      date: finalPaymentDate.toISOString(),
       nextDueDate: currentNextDueDate,
       receiptNo: `KRS-${Date.now().toString().slice(-6)}`
     });

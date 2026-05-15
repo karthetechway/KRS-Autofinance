@@ -20,9 +20,10 @@ import {
 import { format, isToday, addMonths } from 'date-fns';
 
 // Firebase
-import { auth, db } from './firebase';
+import { auth, db, storage } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, onSnapshot, addDoc, updateDoc, doc, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, doc, query, orderBy, deleteDoc } from 'firebase/firestore';
+import { ref, deleteObject } from 'firebase/storage';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -192,6 +193,38 @@ const App = () => {
     }
   };
 
+  const deleteCustomer = async (customerId) => {
+    try {
+      if (window.confirm("Are you sure you want to PERMANENTLY DELETE this customer and ALL their associated files (Photos, RC copies, Aadhar)? This cannot be undone.")) {
+        const customer = customers.find(c => c.id === customerId);
+        if (!customer) return;
+
+        // List of potential file fields
+        const fileFields = ['photo', 'rcFront', 'rcBack', 'aadharFront', 'aadharBack'];
+        
+        // Delete each file from storage if it exists
+        for (const field of fileFields) {
+          const fileUrl = customer[field];
+          if (fileUrl && typeof fileUrl === 'string' && fileUrl.startsWith('http')) {
+            try {
+              const fileRef = ref(storage, fileUrl);
+              await deleteObject(fileRef);
+              console.log(`Deleted file: ${field}`);
+            } catch (storageErr) {
+              console.warn(`Could not delete storage file for ${field}:`, storageErr);
+            }
+          }
+        }
+
+        // Delete the firestore document
+        await deleteDoc(doc(db, "customers", customerId));
+      }
+    } catch (err) {
+      console.error("Error deleting customer:", err);
+      alert("Failed to delete record.");
+    }
+  };
+
   const closeAccount = async (customerId, closureData) => {
     try {
       await updateDoc(doc(db, "customers", customerId), {
@@ -357,12 +390,12 @@ const App = () => {
                 />
               )}
               {activeTab === 'new-loan' && <LoanRegistration onAdd={addLoan} onUpdate={updateCustomer} editingCustomer={editingCustomer} onCancel={() => { setEditingCustomer(null); setActiveTab('customers'); }} />}
-              {activeTab === 'customers' && <CustomerDatabase customers={customers.filter(c => c.status !== 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport}  onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} onNavigate={setActiveTab} />}
+              {activeTab === 'customers' && <CustomerDatabase customers={customers.filter(c => c.status !== 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport}  onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} onDelete={deleteCustomer} onNavigate={setActiveTab} />}
               {activeTab === 'collections' && <CollectionSheet customers={customers} onPay={recordPayment} searchQuery={searchQuery} />}
-              {activeTab === 'pending' && <CustomerDatabase customers={customers.filter(c => c.partialEMIPaid > 0)} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport}  onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} isPartialView={true} onPay={recordPayment} onNavigate={setActiveTab} />}
+              {activeTab === 'pending' && <CustomerDatabase customers={customers.filter(c => c.partialEMIPaid > 0)} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport}  onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} isPartialView={true} onPay={recordPayment} onNavigate={setActiveTab} onDelete={deleteCustomer} />}
               {activeTab === 'ledger' && <Ledger customers={customers} searchQuery={searchQuery} />}
               {activeTab === 'reports' && <PaymentReports customers={customers} />}
-              {activeTab === 'closed' && <CustomerDatabase customers={customers.filter(c => c.status === 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport}  onAdd={addLoan} onEdit={handleEdit} isClosedView={true} onNavigate={setActiveTab} />}
+              {activeTab === 'closed' && <CustomerDatabase customers={customers.filter(c => c.status === 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport}  onAdd={addLoan} onEdit={handleEdit} isClosedView={true} onNavigate={setActiveTab} onDelete={deleteCustomer} />}
             </motion.div>
           </AnimatePresence>
         </section>

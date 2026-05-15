@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { isToday } from 'date-fns';
-import { Phone, History, Bike, Search, Download, Upload, User, X, FileText, ShieldCheck, Zap, ArrowUpRight, Calculator, IndianRupee, UserPlus, PlusCircle, MessageSquare, Edit, FileCheck, ChevronLeft, ChevronRight, MoreVertical, MapPin } from 'lucide-react';
+import { Phone, History, Bike, Search, Download, Upload, User, X, FileText, ShieldCheck, Zap, ArrowUpRight, Calculator, IndianRupee, UserPlus, PlusCircle, MessageSquare, Edit, Trash2, FileCheck, ChevronLeft, ChevronRight, MoreVertical, MapPin } from 'lucide-react';
 import { parseCSVData, calculatePreClosure } from '../utils/finance';
 import { format } from 'date-fns';
 import LoanRegistration from './LoanRegistration';
 
-const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, onAdd, onEdit, onCloseAccount, isClosedView = false, isPartialView = false, onPay, onNavigate }) => {
+const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, onAdd, onEdit, onCloseAccount, isClosedView = false, isPartialView = false, onPay, onNavigate, onDelete }) => {
   const [showImport, setShowImport] = useState(false);
   const [showDetails, setShowDetails] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -190,6 +190,14 @@ const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, on
                         title="Document Vault"
                       >
                         <FileText size={14} />
+                      </button>
+                      <button 
+                        onClick={() => onDelete(c.id)}
+                        className="action-icon-btn"
+                        title="Delete Record"
+                        style={{ color: '#ff3d5e', borderColor: 'rgba(255,61,94,0.1)' }}
+                      >
+                        <Trash2 size={14} />
                       </button>
                       
                       {!isClosedView && (
