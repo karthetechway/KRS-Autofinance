@@ -10,6 +10,7 @@ const CollectionSheet = ({ customers, onPay, searchQuery }) => {
   const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [emiPaid, setEmiPaid] = useState('');
   const [lateFeesPaid, setLateFeesPaid] = useState('');
+  const [isBackfill, setIsBackfill] = useState(false);
 
   const filteredCustomers = customers.filter(c => {
     const query = (searchQuery || "").toLowerCase().trim();
