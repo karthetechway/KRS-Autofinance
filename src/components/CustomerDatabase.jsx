@@ -5,7 +5,7 @@ import { parseCSVData, calculatePreClosure } from '../utils/finance';
 import { format } from 'date-fns';
 import LoanRegistration from './LoanRegistration';
 
-const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, onAdd, onEdit, onCloseAccount, isClosedView = false, isPartialView = false, onPay }) => {
+const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, onAdd, onEdit, onCloseAccount, isClosedView = false, isPartialView = false, onPay, onNavigate }) => {
   const [showImport, setShowImport] = useState(false);
   const [showDetails, setShowDetails] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -173,6 +173,16 @@ const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, on
                         title="Edit Contract"
                       >
                         <Edit size={14} />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          onSearchChange(c.name);
+                          onNavigate('ledger');
+                        }}
+                        className="action-icon-btn"
+                        title="View Payment History"
+                      >
+                        <History size={14} />
                       </button>
                       <button 
                         onClick={() => setShowDetails(c)}

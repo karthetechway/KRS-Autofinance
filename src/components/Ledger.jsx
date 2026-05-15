@@ -48,6 +48,7 @@ const Ledger = ({ customers, searchQuery }) => {
           <thead>
             <tr>
               <th>Date</th>
+              <th>Installment #</th>
               <th>Receipt ID</th>
               <th>Customer / Vehicle</th>
               <th>Amount Paid</th>
@@ -61,6 +62,13 @@ const Ledger = ({ customers, searchQuery }) => {
                 <td>
                   <p className="font-black" style={{ fontSize: '14px' }}>{format(new Date(p.date), 'dd MMM yyyy')}</p>
                   <p className="label" style={{ fontSize: '9px', margin: 0 }}>{format(new Date(p.date), 'hh:mm a')}</p>
+                </td>
+                <td>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--border)' }}>
+                      #{p.installmentNumber || 'N/A'}
+                    </span>
+                  </div>
                 </td>
                 <td>
                   <span className="badge" style={{ background: 'rgba(255,61,94,0.1)', color: 'var(--accent-main)', fontWeight: 800 }}>{p.id}</span>
@@ -131,7 +139,7 @@ const Ledger = ({ customers, searchQuery }) => {
 
                 <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '20px 0', marginBottom: '32px' }}>
                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '14px' }}>EMI Installment</span>
+                      <span style={{ fontSize: '14px', fontWeight: 600 }}>EMI Installment #{selectedReceipt.installmentNumber}</span>
                       <span style={{ fontSize: '14px', fontWeight: 900 }}>₹{selectedReceipt.emiPaid}</span>
                    </div>
                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>

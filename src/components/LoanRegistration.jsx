@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Camera, ShieldCheck, FileText, IndianRupee, Calendar, User, Phone, MapPin, Bike, Calculator, Zap, CheckCircle2, Loader2 } from 'lucide-react';
 import { calculateEMI } from '../utils/finance';
-import { format } from 'date-fns';
+import { format, addMonths } from 'date-fns';
 import { storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -12,7 +12,7 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
     name: '', phone: '', address: '', aadhar: '',
     vehicleModel: '', vehicleNumber: '', modelYear: format(new Date(), 'yyyy'),
     loanAmount: '', interestRate: '', emiMonths: '',
-    docCharge: '10', paidEMI: 0, nextDueDate: format(new Date(), 'yyyy-MM-dd'),
+    docCharge: '10', paidEMI: 0, loanStartDate: format(new Date(), 'yyyy-MM-dd'), nextDueDate: format(new Date(), 'yyyy-MM-dd'),
     photo: null, photoName: '', 
     rcFront: null, rcFrontName: '', rcBack: null, rcBackName: '',
     aadharFront: null, aadharFrontName: '', aadharBack: null, aadharBackName: ''
@@ -46,6 +46,18 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
     // If we were editing a customer and switched to a different tab, cancel the edit mode
     if (editingCustomer) {
       onCancel();
+    }
+  };
+
+  // Helper to update nextDueDate based on loanStartDate and paidEMI
+  const suggestDueDate = (startDate, paidCount) => {
+    if (!startDate) return;
+    try {
+      const date = new Date(startDate);
+      const suggested = format(addMonths(date, parseInt(paidCount) + 1), 'yyyy-MM-dd');
+      setFormData(prev => ({ ...prev, nextDueDate: suggested }));
+    } catch (e) {
+      console.error("Date suggestion failed", e);
     }
   };
 
@@ -238,8 +250,12 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
                   required
                   className="input-modern" 
                   type="date" 
-                  value={formData.nextDueDate} 
-                  onChange={(e) => setFormData({...formData, nextDueDate: e.target.value})} 
+                  value={formData.loanStartDate} 
+                  onChange={(e) => {
+                    const newStart = e.target.value;
+                    setFormData({...formData, loanStartDate: newStart});
+                    suggestDueDate(newStart, formData.paidEMI);
+                  }} 
                 />
               </div>
             )}
@@ -247,7 +263,21 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
             {tab === 'migrate' && (
               <div className="animate-fade" style={{ padding: '24px', background: 'rgba(255,61,94,0.05)', borderRadius: '16px', marginBottom: '32px', border: '1px solid var(--border-accent)' }}>
                  <p className="label" style={{ color: 'var(--accent-main)' }}>MIGRATION DETAILS</p>
-                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                    <div className="input-group">
+                      <label className="label">Loan Start Date</label>
+                      <input 
+                        required
+                        className="input-modern" 
+                        type="date" 
+                        value={formData.loanStartDate} 
+                        onChange={(e) => {
+                          const newStart = e.target.value;
+                          setFormData({...formData, loanStartDate: newStart});
+                          suggestDueDate(newStart, formData.paidEMI);
+                        }} 
+                      />
+                    </div>
                     <div className="input-group">
                       <label className="label">Already Paid EMIs</label>
                       <input 
@@ -255,14 +285,18 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
                         className="input-modern" 
                         type="number" 
                         value={formData.paidEMI === 0 ? '' : formData.paidEMI} 
-                        onChange={(e) => setFormData({...formData, paidEMI: e.target.value === '' ? 0 : parseInt(e.target.value)})} 
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                          setFormData({...formData, paidEMI: val});
+                          suggestDueDate(formData.loanStartDate, val);
+                        }} 
                         placeholder="0"
                       />
                     </div>
-                    <div className="input-group">
-                      <label className="label">Next EMI Due Date</label>
-                      <input required className="input-modern" type="date" value={formData.nextDueDate} onChange={(e) => setFormData({...formData, nextDueDate: e.target.value})} />
-                    </div>
+                 </div>
+                 <div className="input-group">
+                    <label className="label">Next EMI Due Date (Auto-Suggested)</label>
+                    <input required className="input-modern" type="date" value={formData.nextDueDate} onChange={(e) => setFormData({...formData, nextDueDate: e.target.value})} />
                  </div>
               </div>
             )}

@@ -82,8 +82,10 @@ const App = () => {
         ...loanData,
         status: 'active',
         onboardingDate: new Date().toISOString(),
+        loanStartDate: loanData.loanStartDate || new Date().toISOString(),
         paymentHistory: [],
         partialEMIPaid: 0,
+        paidEMI: parseInt(loanData.paidEMI || 0),
         customId: `KRS-${Math.floor(1000 + Math.random() * 9000)}`
       };
       await addDoc(collection(db, "customers"), newCustomer);
@@ -97,7 +99,10 @@ const App = () => {
   const updateCustomer = async (updatedData) => {
     try {
       const { id, ...data } = updatedData;
-      await updateDoc(doc(db, "customers", id), data);
+      await updateDoc(doc(db, "customers", id), {
+        ...data,
+        paidEMI: parseInt(data.paidEMI || 0)
+      });
       setEditingCustomer(null);
       setActiveTab('customers');
     } catch (err) {
@@ -110,38 +115,61 @@ const App = () => {
       const customer = customers.find(c => c.id === customerId);
       if (!customer) return;
 
-      let { paidEMI, partialEMIPaid = 0, nextDueDate, totalLateFeesPaid = 0 } = customer;
+      let paidEMI = parseInt(customer.paidEMI || 0);
+      let partialEMIPaid = parseFloat(customer.partialEMIPaid || 0);
+      let nextDueDate = customer.nextDueDate;
+      let totalLateFeesPaid = parseFloat(customer.totalLateFeesPaid || 0);
+      
       const emiPaidNow = parseFloat(paymentData.emiPaid || 0);
       const lateFeesPaidNow = parseFloat(paymentData.lateFeesPaid || 0);
       
-      let totalEMIContributed = (parseFloat(partialEMIPaid) || 0) + emiPaidNow;
+      let totalEMIContributed = partialEMIPaid + emiPaidNow;
       const emiCost = parseFloat(customer.emiAmount);
       
-      let installmentsAdded = 0;
-      while (totalEMIContributed >= emiCost && paidEMI < customer.emiMonths) {
-        paidEMI += 1;
+      const payments = [];
+      let currentPaidEMI = paidEMI;
+      let currentNextDueDate = nextDueDate;
+
+      while (totalEMIContributed >= emiCost && currentPaidEMI < customer.emiMonths) {
+        currentPaidEMI += 1;
         totalEMIContributed -= emiCost;
-        installmentsAdded += 1;
-        nextDueDate = format(addMonths(new Date(nextDueDate), 1), 'yyyy-MM-dd');
+        
+        const paymentRecord = {
+          id: `PAY-${Date.now().toString().slice(-6)}-${currentPaidEMI}`,
+          date: paymentData.date,
+          amount: emiCost + (payments.length === 0 ? lateFeesPaidNow : 0),
+          emiPaid: emiCost,
+          lateFeesPaid: payments.length === 0 ? lateFeesPaidNow : 0,
+          type: 'EMI Payment',
+          installmentNumber: currentPaidEMI,
+          customerName: customer.name,
+          vehicleNumber: customer.vehicleNumber
+        };
+        payments.push(paymentRecord);
+        currentNextDueDate = format(addMonths(new Date(currentNextDueDate), 1), 'yyyy-MM-dd');
       }
 
-      const paymentRecord = {
-        id: `PAY-${Date.now().toString().slice(-6)}`,
-        date: paymentData.date,
-        amount: emiPaidNow + lateFeesPaidNow,
-        emiPaid: emiPaidNow,
-        lateFeesPaid: lateFeesPaidNow,
-        type: installmentsAdded > 0 ? 'EMI Payment' : 'Partial Payment',
-        customerName: customer.name,
-        vehicleNumber: customer.vehicleNumber
-      };
+      // If no full installments were added (Partial Payment)
+      if (payments.length === 0 && emiPaidNow > 0) {
+        payments.push({
+          id: `PAY-${Date.now().toString().slice(-6)}-P`,
+          date: paymentData.date,
+          amount: emiPaidNow + lateFeesPaidNow,
+          emiPaid: emiPaidNow,
+          lateFeesPaid: lateFeesPaidNow,
+          type: 'Partial Payment',
+          installmentNumber: currentPaidEMI + 1,
+          customerName: customer.name,
+          vehicleNumber: customer.vehicleNumber
+        });
+      }
 
       await updateDoc(doc(db, "customers", customerId), {
-        paidEMI,
+        paidEMI: currentPaidEMI,
         partialEMIPaid: totalEMIContributed,
-        nextDueDate,
-        totalLateFeesPaid: (parseFloat(totalLateFeesPaid) || 0) + lateFeesPaidNow,
-        paymentHistory: [paymentRecord, ...(customer.paymentHistory || [])]
+        nextDueDate: currentNextDueDate,
+        totalLateFeesPaid: totalLateFeesPaid + lateFeesPaidNow,
+        paymentHistory: [...payments, ...(customer.paymentHistory || [])]
       });
     } catch (err) {
       console.error("Error recording payment:", err);
@@ -313,12 +341,12 @@ const App = () => {
                 />
               )}
               {activeTab === 'new-loan' && <LoanRegistration onAdd={addLoan} onUpdate={updateCustomer} editingCustomer={editingCustomer} onCancel={() => { setEditingCustomer(null); setActiveTab('customers'); }} />}
-              {activeTab === 'customers' && <CustomerDatabase customers={customers.filter(c => c.status !== 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport}  onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} />}
+              {activeTab === 'customers' && <CustomerDatabase customers={customers.filter(c => c.status !== 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport}  onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} onNavigate={setActiveTab} />}
               {activeTab === 'collections' && <CollectionSheet customers={customers} onPay={recordPayment} searchQuery={searchQuery} />}
-              {activeTab === 'pending' && <CustomerDatabase customers={customers.filter(c => c.partialEMIPaid > 0)} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport}  onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} isPartialView={true} onPay={recordPayment} />}
+              {activeTab === 'pending' && <CustomerDatabase customers={customers.filter(c => c.partialEMIPaid > 0)} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport}  onAdd={addLoan} onEdit={handleEdit} onCloseAccount={closeAccount} isPartialView={true} onPay={recordPayment} onNavigate={setActiveTab} />}
               {activeTab === 'ledger' && <Ledger customers={customers} searchQuery={searchQuery} />}
               {activeTab === 'reports' && <PaymentReports customers={customers} />}
-              {activeTab === 'closed' && <CustomerDatabase customers={customers.filter(c => c.status === 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport}  onAdd={addLoan} onEdit={handleEdit} isClosedView={true} />}
+              {activeTab === 'closed' && <CustomerDatabase customers={customers.filter(c => c.status === 'closed')} searchQuery={searchQuery} onSearchChange={setSearchQuery} onImport={handleImport}  onAdd={addLoan} onEdit={handleEdit} isClosedView={true} onNavigate={setActiveTab} />}
             </motion.div>
           </AnimatePresence>
         </section>

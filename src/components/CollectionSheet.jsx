@@ -39,12 +39,16 @@ const CollectionSheet = ({ customers, onPay, searchQuery }) => {
       date: new Date(paymentDate).toISOString()
     });
     
-    // Calculate installment info for receipt
     const emiCost = parseFloat(selected.emiAmount);
     const emiPaidNow = parseFloat(emiPaid || 0);
     const totalContributed = (parseFloat(selected.partialEMIPaid) || 0) + emiPaidNow;
     const installmentsAdded = Math.floor(totalContributed / emiCost);
     
+    let currentNextDueDate = selected.nextDueDate;
+    for (let i = 0; i < installmentsAdded; i++) {
+      currentNextDueDate = format(addMonths(new Date(currentNextDueDate), 1), 'yyyy-MM-dd');
+    }
+
     let instInfo = `Installment ${selected.paidEMI + 1}`;
     if (installmentsAdded > 1) {
       instInfo = `Installments ${selected.paidEMI + 1} - ${selected.paidEMI + installmentsAdded}`;
@@ -59,6 +63,7 @@ const CollectionSheet = ({ customers, onPay, searchQuery }) => {
       lateFeesPaid: lateFeesPaid || 0,
       instInfo: instInfo,
       date: new Date(paymentDate).toISOString(),
+      nextDueDate: currentNextDueDate,
       receiptNo: `KRS-${Date.now().toString().slice(-6)}`
     });
     
@@ -135,7 +140,7 @@ const CollectionSheet = ({ customers, onPay, searchQuery }) => {
               <CheckCircle2 size={16} />
               <p style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase' }}>Payment Adjusted to Record</p>
             </div>
-            <p style={{ fontSize: '10px', color: '#999', marginTop: '12px' }}>Next Due: {format(addMonths(new Date(data.customer.nextDueDate), 1), 'dd MMM yyyy')}</p>
+            <p style={{ fontSize: '10px', color: '#999', marginTop: '12px' }}>Next Due: {format(new Date(data.nextDueDate), 'dd MMM yyyy')}</p>
           </div>
         </div>
 
