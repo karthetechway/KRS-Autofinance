@@ -113,7 +113,7 @@ const Ledger = ({ customers, searchQuery }) => {
       {selectedReceipt && (
         <div className="modal-overlay">
           <div className="modal-content animate-fade" style={{ maxWidth: '400px', padding: 0, overflow: 'hidden' }}>
-             <div id="receipt-print" style={{ padding: '40px', background: '#fff', color: '#000' }}>
+             <div id="printable-receipt" style={{ padding: '40px', background: '#fff', color: '#000' }}>
                 <div style={{ textAlign: 'center', marginBottom: '32px', borderBottom: '2px solid #000', paddingBottom: '20px' }}>
                    <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 900 }}>KRS AUTO FINANCE</h2>
                    <p style={{ fontSize: '12px', margin: '4px 0', opacity: 0.8 }}>Professional Vehicle Financing & Services</p>

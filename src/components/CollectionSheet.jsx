@@ -36,23 +36,26 @@ const CollectionSheet = ({ customers, onPay, searchQuery }) => {
     onPay(selected.id, {
       emiPaid: emiPaid || 0,
       lateFeesPaid: lateFeesPaid || 0,
-      date: new Date(paymentDate).toISOString()
+      date: new Date(paymentDate).toISOString(),
+      isBackfill: isBackfill
     });
     
     const emiCost = parseFloat(selected.emiAmount);
     const emiPaidNow = parseFloat(emiPaid || 0);
     const totalContributed = (parseFloat(selected.partialEMIPaid) || 0) + emiPaidNow;
-    const installmentsAdded = Math.floor(totalContributed / emiCost);
+    const installmentsAdded = isBackfill ? 0 : Math.floor(totalContributed / emiCost);
     
     let currentNextDueDate = selected.nextDueDate;
-    for (let i = 0; i < installmentsAdded; i++) {
-      currentNextDueDate = format(addMonths(new Date(currentNextDueDate), 1), 'yyyy-MM-dd');
+    if (!isBackfill) {
+      for (let i = 0; i < installmentsAdded; i++) {
+        currentNextDueDate = format(addMonths(new Date(currentNextDueDate), 1), 'yyyy-MM-dd');
+      }
     }
 
-    let instInfo = `Installment ${selected.paidEMI + 1}`;
-    if (installmentsAdded > 1) {
+    let instInfo = isBackfill ? 'Past Payment Record' : `Installment ${selected.paidEMI + 1}`;
+    if (!isBackfill && installmentsAdded > 1) {
       instInfo = `Installments ${selected.paidEMI + 1} - ${selected.paidEMI + installmentsAdded}`;
-    } else if (installmentsAdded === 0 && emiPaidNow > 0) {
+    } else if (!isBackfill && installmentsAdded === 0 && emiPaidNow > 0) {
       instInfo = `Installment ${selected.paidEMI + 1} (Partial Payment)`;
     }
 
@@ -70,6 +73,7 @@ const CollectionSheet = ({ customers, onPay, searchQuery }) => {
     setSelected(null);
     setEmiPaid('');
     setLateFeesPaid('');
+    setIsBackfill(false);
     setPaymentDate(format(new Date(), 'yyyy-MM-dd'));
   };
 
@@ -269,6 +273,18 @@ const CollectionSheet = ({ customers, onPay, searchQuery }) => {
                   placeholder="0"
                 />
               </div>
+            </div>
+
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={isBackfill} 
+                  onChange={(e) => setIsBackfill(e.target.checked)}
+                  style={{ width: '18px', height: '18px', accentColor: 'var(--accent-main)' }}
+                />
+                Backfill / Past Payment (No count increment)
+              </label>
             </div>
 
             <div style={{ display: 'flex', gap: '16px' }}>

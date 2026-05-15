@@ -367,7 +367,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   body * {
     visibility: hidden;
   }
-  #receipt-print, #receipt-print * {
+  #printable-receipt, #printable-receipt * {
     visibility: visible;
   }
   #receipt-print {

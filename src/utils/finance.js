@@ -22,8 +22,11 @@ export const calculateEMI = (principal, rate, months) => {
   const documentCharges = p * 0.10; // 10% deduction
   const amountInHand = p - documentCharges;
 
+  // Round EMI to next 10
+  const roundedEmi = Math.ceil(emi / 10) * 10;
+
   return {
-    emi: emi.toFixed(2),
+    emi: roundedEmi.toFixed(2),
     totalInterest: totalInterest.toFixed(2),
     totalPayable: totalPayable.toFixed(2),
     documentCharges: documentCharges.toFixed(2),

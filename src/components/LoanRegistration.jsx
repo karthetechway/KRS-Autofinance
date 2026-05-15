@@ -120,7 +120,7 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
       const finalData = { 
         ...formData, 
         ...emiDetails, 
-        emiAmount: emiDetails.emi,
+        emiAmount: (Math.ceil(parseFloat(emiDetails.emi || 0) / 10) * 10).toFixed(2),
         photo: photoUrl || formData.photo,
         rcFront: rcFrontUrl || formData.rcFront,
         rcBack: rcBackUrl || formData.rcBack,
@@ -304,7 +304,7 @@ const LoanRegistration = ({ onAdd, onUpdate, editingCustomer, onCancel }) => {
             <div style={{ padding: '32px', background: 'rgba(255,255,255,0.02)', borderRadius: '24px', border: '1px solid var(--border)' }}>
                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                  <span className="label">EMI Amount (Monthly)</span>
-                 <span className="font-black" style={{ fontSize: '24px', color: 'var(--accent-main)' }}>₹{emiDetails.emi || '0.00'}</span>
+                 <span className="font-black" style={{ fontSize: '24px', color: 'var(--accent-main)' }}>₹{(Math.ceil(parseFloat(emiDetails.emi || 0) / 10) * 10).toFixed(2)}</span>
                </div>
                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
                  <span className="label">Document Charge (10% Deducted)</span>

@@ -130,38 +130,54 @@ const App = () => {
       let currentPaidEMI = paidEMI;
       let currentNextDueDate = nextDueDate;
 
-      while (totalEMIContributed >= emiCost && currentPaidEMI < customer.emiMonths) {
-        currentPaidEMI += 1;
-        totalEMIContributed -= emiCost;
-        
+      if (paymentData.isBackfill) {
+        // Just record history, don't change status
         const paymentRecord = {
-          id: `PAY-${Date.now().toString().slice(-6)}-${currentPaidEMI}`,
-          date: paymentData.date,
-          amount: emiCost + (payments.length === 0 ? lateFeesPaidNow : 0),
-          emiPaid: emiCost,
-          lateFeesPaid: payments.length === 0 ? lateFeesPaidNow : 0,
-          type: 'EMI Payment',
-          installmentNumber: currentPaidEMI,
-          customerName: customer.name,
-          vehicleNumber: customer.vehicleNumber
-        };
-        payments.push(paymentRecord);
-        currentNextDueDate = format(addMonths(new Date(currentNextDueDate), 1), 'yyyy-MM-dd');
-      }
-
-      // If no full installments were added (Partial Payment)
-      if (payments.length === 0 && emiPaidNow > 0) {
-        payments.push({
-          id: `PAY-${Date.now().toString().slice(-6)}-P`,
+          id: `PAY-${Date.now().toString().slice(-6)}-B`,
           date: paymentData.date,
           amount: emiPaidNow + lateFeesPaidNow,
           emiPaid: emiPaidNow,
           lateFeesPaid: lateFeesPaidNow,
-          type: 'Partial Payment',
-          installmentNumber: currentPaidEMI + 1,
+          type: 'Historical Adjustment',
+          installmentNumber: 'Past',
           customerName: customer.name,
           vehicleNumber: customer.vehicleNumber
-        });
+        };
+        payments.push(paymentRecord);
+      } else {
+        while (totalEMIContributed >= emiCost && currentPaidEMI < customer.emiMonths) {
+          currentPaidEMI += 1;
+          totalEMIContributed -= emiCost;
+          
+          const paymentRecord = {
+            id: `PAY-${Date.now().toString().slice(-6)}-${currentPaidEMI}`,
+            date: paymentData.date,
+            amount: emiCost + (payments.length === 0 ? lateFeesPaidNow : 0),
+            emiPaid: emiCost,
+            lateFeesPaid: payments.length === 0 ? lateFeesPaidNow : 0,
+            type: 'EMI Payment',
+            installmentNumber: currentPaidEMI,
+            customerName: customer.name,
+            vehicleNumber: customer.vehicleNumber
+          };
+          payments.push(paymentRecord);
+          currentNextDueDate = format(addMonths(new Date(currentNextDueDate), 1), 'yyyy-MM-dd');
+        }
+
+        // If no full installments were added (Partial Payment)
+        if (payments.length === 0 && emiPaidNow > 0) {
+          payments.push({
+            id: `PAY-${Date.now().toString().slice(-6)}-P`,
+            date: paymentData.date,
+            amount: emiPaidNow + lateFeesPaidNow,
+            emiPaid: emiPaidNow,
+            lateFeesPaid: lateFeesPaidNow,
+            type: 'Partial Payment',
+            installmentNumber: currentPaidEMI + 1,
+            customerName: customer.name,
+            vehicleNumber: customer.vehicleNumber
+          });
+        }
       }
 
       await updateDoc(doc(db, "customers", customerId), {
