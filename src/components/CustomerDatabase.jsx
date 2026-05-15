@@ -101,7 +101,14 @@ const CustomerDatabase = ({ customers, searchQuery, onSearchChange, onImport, on
           </thead>
           <tbody>
             {currentRecords.map((c) => {
-              const outstanding = parseFloat(c.totalPayable || 0) - (parseFloat(c.emiAmount || 0) * c.paidEMI);
+              const totalEMIPaid = (c.paymentHistory || [])
+                .filter(p => p.type === 'EMI Payment' || p.type === 'Partial Payment' || p.type === 'Historical Adjustment')
+                .reduce((sum, p) => sum + parseFloat(p.emiPaid || 0), 0);
+              
+              // Ensure we don't double count if user both set paidEMI in migration AND backfilled history
+              const basePaid = parseFloat(c.emiAmount || 0) * parseInt(c.paidEMI || 0);
+              const amountActuallyPaid = Math.max(totalEMIPaid, basePaid);
+              const outstanding = parseFloat(c.totalPayable || 0) - amountActuallyPaid;
               return (
                 <tr key={c.id}>
                   <td>

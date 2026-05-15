@@ -101,3 +101,13 @@ export const calculatePreClosure = (customer) => {
     totalAmount: Math.round(total)
   };
 };
+export const getEMISplit = (principal, totalInterest, months) => {
+  const p = parseFloat(principal) || 0;
+  const i = parseFloat(totalInterest) || 0;
+  const m = parseInt(months) || 1;
+  
+  return {
+    principal: (p / m).toFixed(2),
+    interest: (i / m).toFixed(2)
+  };
+};

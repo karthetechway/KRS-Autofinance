@@ -51,7 +51,9 @@ const Ledger = ({ customers, searchQuery }) => {
               <th>Installment #</th>
               <th>Receipt ID</th>
               <th>Customer / Vehicle</th>
-              <th>Amount Paid</th>
+              <th>Principal</th>
+              <th>Interest</th>
+              <th>Total Paid</th>
               <th>Status</th>
               <th style={{ textAlign: 'center' }}>Actions</th>
             </tr>
@@ -78,7 +80,13 @@ const Ledger = ({ customers, searchQuery }) => {
                   <p className="label" style={{ fontSize: '9px', margin: 0 }}>{p.vehicleNumber}</p>
                 </td>
                 <td>
-                  <p className="font-black" style={{ fontSize: '16px' }}>₹{p.amount}</p>
+                  <p className="font-black" style={{ fontSize: '13px' }}>₹{selectedCustomer ? (parseFloat(selectedCustomer.loanAmount) / parseInt(selectedCustomer.emiMonths)).toFixed(2) : '0.00'}</p>
+                </td>
+                <td>
+                  <p className="font-black" style={{ fontSize: '13px' }}>₹{selectedCustomer ? (parseFloat(selectedCustomer.totalInterest) / parseInt(selectedCustomer.emiMonths)).toFixed(2) : '0.00'}</p>
+                </td>
+                <td>
+                  <p className="font-black" style={{ fontSize: '15px', color: 'var(--accent-main)' }}>₹{p.amount}</p>
                 </td>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--success)' }}>
@@ -139,7 +147,15 @@ const Ledger = ({ customers, searchQuery }) => {
 
                 <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '20px 0', marginBottom: '32px' }}>
                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '14px', fontWeight: 600 }}>EMI Installment #{selectedReceipt.installmentNumber}</span>
+                      <span style={{ fontSize: '14px', fontWeight: 600 }}>Principal Component</span>
+                      <span style={{ fontSize: '14px', fontWeight: 600 }}>₹{(parseFloat(selectedReceipt.customer.loanAmount) / parseInt(selectedReceipt.customer.emiMonths)).toFixed(2)}</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 600 }}>Interest Component</span>
+                      <span style={{ fontSize: '14px', fontWeight: 600 }}>₹{(parseFloat(selectedReceipt.customer.totalInterest) / parseInt(selectedReceipt.customer.emiMonths)).toFixed(2)}</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 800 }}>EMI Installment #{selectedReceipt.installmentNumber}</span>
                       <span style={{ fontSize: '14px', fontWeight: 900 }}>₹{selectedReceipt.emiPaid}</span>
                    </div>
                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
